@@ -1,0 +1,402 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 220 13% 18%; /* Updated to darker gray for better readability */
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 18%;
+
+    /* Primary color - Royal Blue */
+    --primary: 217 91% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary color - Teal */
+    --secondary: 199 89% 48%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Accent color - Orange */
+    --accent: 24 94% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 210 20% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Dashboard background - slightly lighter */
+    --dashboard-background: 220 13% 18%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 224 71% 45%;
+
+    --radius: 1.5rem;
+
+    /* Primary in hex format for special cases */
+    --primary-hex: 217, 91%, 53%;
+
+    --gray-b4: 0 0% 71%;
+    --gray-e6: 0 0% 90%;
+
+    --font-urbanist: "Urbanist", sans-serif;
+
+    /* Sidebar colors */
+    --sidebar-background: 210 20% 98%;
+    --sidebar-foreground: 220 13% 28%;
+
+    --sidebar-primary: 217 91% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+
+    --sidebar-accent: 210 20% 96%;
+    --sidebar-accent-foreground: 220 13% 18%;
+
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217 91% 60%;
+
+    /* Semantic colors for status indicators */
+    --success: 142 70% 45%;
+    --warning: 48 96% 53%;
+    --error: 0 84% 60%;
+
+    /* Chart colors */
+    --chart-1: 199 89% 48%; /* Teal */
+    --chart-2: 24 94% 53%; /* Orange */
+    --chart-3: 217 91% 53%; /* Blue */
+    --chart-4: 48 96% 53%; /* Yellow */
+    --chart-5: 142 70% 45%; /* Green */
+
+    /* Grade level colors */
+    --elementary-early: 271 91% 66%; /* Purple */
+    --elementary-late: 199 89% 48%; /* Cyan */
+    --middle-school: 159 84% 39%; /* Emerald */
+    --high-school-early: 217 91% 53%; /* Royal Blue */
+    --high-school-late: 239 84% 67%; /* Indigo */
+
+    /* Subject colors */
+    --subject-math: 199 89% 48%; /* Teal */
+    --subject-science: 159 84% 39%; /* Green */
+    --subject-language: 271 91% 66%; /* Purple */
+    --subject-social: 24 94% 53%; /* Orange */
+    --subject-arts: 330 86% 56%; /* Pink */
+    --subject-pe: 0 84% 60%; /* Red */
+  }
+
+  .logo {
+    & .logo-text {
+      height: auto;
+      width: 80px;
+    }
+  }
+
+  .logo-symbol-wrapper {
+    align-items: center;
+    display: flex;
+    height: 30px;
+    position: relative;
+    justify-content: center;
+    width: 30px;
+
+    & svg {
+      display: inline-flex;
+      height: 100% !important;
+      left: 0;
+      position: absolute;
+      top: 0;
+      width: 100% !important;
+
+      & path {
+        fill: hsl(217, 91%, 53%); /* Primary blue for logo */
+      }
+    }
+  }
+
+  .dark {
+    --background: 220 13% 18%;
+    --foreground: 210 20% 98%;
+
+    --card: 220 13% 18%;
+    --card-foreground: 210 20% 98%;
+
+    --popover: 220 13% 18%;
+    --popover-foreground: 210 20% 98%;
+
+    /* Inverted colors for dark mode */
+    --primary: 217 91% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 199 89% 48%;
+    --secondary-foreground: 0 0% 100%;
+
+    --accent: 24 94% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 220 14% 24%;
+    --muted-foreground: 210 11% 71%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 14% 24%;
+    --input: 220 14% 24%;
+    --ring: 224 71% 60%;
+
+    /* Dark mode chart colors */
+    --chart-1: 217 91% 53%; /* Blue */
+    --chart-2: 24 94% 53%; /* Orange */
+    --chart-3: 48 96% 53%; /* Yellow */
+    --chart-4: 271 91% 66%; /* Purple */
+    --chart-5: 159 84% 39%; /* Green */
+
+    /* Dark mode sidebar */
+    --sidebar-background: 220 13% 18%;
+    --sidebar-foreground: 210 20% 98%;
+
+    --sidebar-primary: 217 91% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+
+    --sidebar-accent: 220 14% 24%;
+    --sidebar-accent-foreground: 210 20% 98%;
+
+    --sidebar-border: 220 14% 24%;
+    --sidebar-ring: 217 91% 60%;
+
+    .btn-fill.primary {
+      @apply bg-primary-hex text-white;
+    }
+
+    .logo-symbol-wrapper {
+      & svg {
+        & path {
+          fill: hsl(217, 91%, 53%); /* Keep primary blue for logo in dark mode */
+        }
+      }
+    }
+
+    .logo {
+      & .logo-text {
+        height: auto;
+        width: 80px;
+
+        & path {
+          fill: #fff;
+        }
+      }
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-urbanist);
+  }
+
+  .btn-fill {
+    @apply rounded-full;
+  }
+
+  .btn-fill.primary {
+    @apply bg-primary text-primary-foreground hover:brightness-110 transition-all;
+  }
+
+  .btn-fill.secondary {
+    @apply bg-secondary text-secondary-foreground hover:brightness-110 transition-all;
+  }
+
+  .btn-fill.accent {
+    @apply bg-accent text-accent-foreground hover:brightness-110 transition-all;
+  }
+
+  /* New class for grade-level indicators */
+  .grade-indicator {
+    @apply inline-block w-3 h-3 rounded-full mr-2;
+  }
+
+  .grade-k-2 {
+    @apply bg-[hsl(var(--elementary-early))];
+  }
+
+  .grade-3-5 {
+    @apply bg-[hsl(var(--elementary-late))];
+  }
+
+  .grade-6-8 {
+    @apply bg-[hsl(var(--middle-school))];
+  }
+
+  .grade-9-10 {
+    @apply bg-[hsl(var(--high-school-early))];
+  }
+
+  .grade-11-12 {
+    @apply bg-[hsl(var(--high-school-late))];
+  }
+
+  /* Subject indicators */
+  .subject-indicator {
+    @apply inline-block w-3 h-3 rounded-full mr-2;
+  }
+
+  .subject-math {
+    @apply bg-[hsl(var(--subject-math))];
+  }
+
+  .subject-science {
+    @apply bg-[hsl(var(--subject-science))];
+  }
+
+  .subject-language {
+    @apply bg-[hsl(var(--subject-language))];
+  }
+
+  .subject-social {
+    @apply bg-[hsl(var(--subject-social))];
+  }
+
+  .subject-arts {
+    @apply bg-[hsl(var(--subject-arts))];
+  }
+
+  .subject-pe {
+    @apply bg-[hsl(var(--subject-pe))];
+  }
+
+  /* Status indicators */
+  .status-success {
+    @apply bg-[hsl(var(--success))];
+  }
+
+  .status-warning {
+    @apply bg-[hsl(var(--warning))];
+  }
+
+  .status-error {
+    @apply bg-[hsl(var(--error))];
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  @media (max-width: 768px) {
+    .container {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+
+  /* Hover effects for interactive elements */
+  .hover-lift {
+    @apply transition-transform duration-200 hover:-translate-y-1;
+  }
+
+  /* Focus outlines for accessibility */
+  .focus-visible:focus-visible {
+    @apply outline-none ring-2 ring-[hsl(var(--ring))] ring-offset-2 ring-offset-background;
+  }
+}
+
+/* DatePicker styling with updated colors */
+.react-datepicker {
+  @apply border border-border rounded-lg shadow-lg font-sans;
+}
+
+.react-datepicker-wrapper {
+  @apply w-full;
+}
+
+.react-datepicker__triangle {
+  @apply dark:!fill-dashboard-background dark:!text-dashboard-background dark:!stroke-none;
+}
+.react-datepicker__header {
+  @apply dark:bg-dashboard-background border-b border-border dark:text-white !rounded-t-lg;
+}
+
+.react-datepicker__header__dropdown {
+  @apply my-4 flex justify-center gap-1;
+}
+
+.react-datepicker__header__dropdown select {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+  background-position: 90% center;
+  background-size: 14px;
+  background-repeat: no-repeat;
+  @apply rounded-sm w-20 py-1 px-2 appearance-none;
+}
+
+.react-datepicker__header__dropdown
+  .react-datepicker__month-dropdown-container--select,
+.react-datepicker__header__dropdown
+  .react-datepicker__year-dropdown-container--select {
+  @apply m-0;
+}
+
+.react-datepicker__day-names .react-datepicker__day-name {
+  @apply dark:text-white;
+}
+
+.dark .react-datepicker__header__dropdown select {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+}
+
+.react-datepicker__current-month,
+.react-datepicker-time__header,
+.react-datepicker-year-header {
+  @apply text-foreground;
+}
+
+.react-datepicker__navigation {
+  @apply top-3 border-border;
+}
+
+.react-datepicker__navigation:hover {
+  @apply border-foreground;
+}
+
+.react-datepicker__day {
+  @apply dark:text-background hover:bg-accent;
+}
+
+.react-datepicker__day--selected {
+  @apply dark:bg-[hsl(var(--primary))] dark:!text-white bg-[hsl(var(--primary))] text-white hover:!bg-[hsl(var(--accent))] hover:!text-black;
+}
+
+.react-datepicker__day--selected:focus,
+.react-datepicker__day--selected:hover {
+  @apply !bg-[hsl(var(--accent))] !text-black;
+}
+
+.react-datepicker__day--keyboard-selected {
+  @apply dark:bg-[hsl(var(--primary))] dark:!text-white bg-[hsl(var(--primary))] text-white;
+}
+
+.react-datepicker__day--keyboard-selected:focus,
+.react-datepicker__day--keyboard-selected:hover {
+  @apply bg-[hsl(var(--accent))] text-black;
+}
+
+.react-datepicker-popper {
+  z-index: 1000 !important;
+}
+
+.react-datepicker__month .react-datepicker__week:not(:last-child) {
+  border-bottom: 1px solid #e6e6e6;
+}
