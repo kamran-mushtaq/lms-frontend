@@ -231,7 +231,7 @@ export function ParentRegistrationForm({
                 <FormItem>
                   <FormLabel>City</FormLabel>
                   <FormControl>
-                    <Input placeholder="New York" {...field} />
+                    <Input placeholder="Karachi" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
