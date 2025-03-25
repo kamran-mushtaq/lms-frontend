@@ -1,28 +1,17 @@
-// src/app/dashboard/page.tsx
+// app/dashboard/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, BarChart, Book, BookOpen, Clock, Award, Bookmark, AlertCircle } from "lucide-react";
-
-// Use the correct import paths
-import { 
-  checkStudentAptitudeTestRequired, 
-  getStudentEnrollments, 
-  getStudentClasses, 
-  getClassSubjects,
-  getStudentProgressOverview
-} from "../aptitude-test/api/assessment-api";
-
-import { getStudentProgress } from "./api/progress-service";
-
-// Import components - these should be created separately
+import { Loader2, BookOpen, Clock, Award, BarChart, Book, Bookmark, AlertCircle } from "lucide-react";
+import { checkStudentAptitudeTestRequired, getStudentProgressOverview, getStudentEnrollments, getStudentClasses, getClassSubjects } from "../aptitude-test/api/assessment-api";
 import { SubjectCard } from "./components/subject-card";
 import { ProgressOverviewCard } from "./components/progress-overview-card";
 import { UpcomingAssessmentsCard } from "./components/upcoming-assessments-card";
@@ -40,6 +29,7 @@ export default function DashboardPage() {
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [aptitudeTestsChecked, setAptitudeTestsChecked] = useState(false);
   
   // Load user data on component mount
   useEffect(() => {
@@ -54,7 +44,7 @@ export default function DashboardPage() {
     
     // Check if student needs to take aptitude test first
     checkAptitudeTestRequirement();
-  }, [router]);
+  }, []);
   
   // Check if aptitude test is required
   const checkAptitudeTestRequirement = async () => {
@@ -68,15 +58,37 @@ export default function DashboardPage() {
       const user = JSON.parse(storedUser);
       const studentId = user._id;
       
+      // First, let's get all the enrollments to know what's already passed
+      const enrollmentsData = await getStudentEnrollments(studentId, { isEnrolled: true });
+      
+      // Check if there are any enrollments that don't have aptitudeTestPassed set to true
+      const pendingTests = enrollmentsData.filter(enrollment => 
+        enrollment.isEnrolled && !enrollment.aptitudeTestPassed
+      );
+      
+      // Also check with the dedicated API endpoint
       const result = await checkStudentAptitudeTestRequired(studentId);
       
-      if (result.required) {
-        // Redirect to aptitude test page
-        router.push('/aptitude-test');
-        return;
+      console.log("Aptitude test check result:", result);
+      console.log("Pending aptitude tests from enrollments:", pendingTests);
+      
+      // Only redirect if the API says tests are required AND there are actual pending tests
+      if (result.required && pendingTests.length > 0) {
+        // Store a flag in localStorage to prevent infinite redirects
+        const redirectTimeout = localStorage.getItem('aptitude_redirect_timestamp');
+        const currentTime = Date.now();
+        
+        // Only redirect if there's no recent redirect (within last 10 seconds)
+        if (!redirectTimeout || (currentTime - parseInt(redirectTimeout)) > 10000) {
+          localStorage.setItem('aptitude_redirect_timestamp', currentTime.toString());
+          router.push('/aptitude-test');
+          return;
+        }
       }
       
-      // If no aptitude test is required, load dashboard data
+      setAptitudeTestsChecked(true);
+      
+      // If no aptitude test is required or we're preventing a redirect loop, load dashboard data
       loadDashboardData(studentId);
     } catch (error) {
       console.error('Error checking aptitude test requirement:', error);
@@ -96,8 +108,16 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       
-      // Load enrollments
-      const enrollmentsData = await getStudentEnrollments(studentId, { isEnrolled: true });
+      // Load progress overview
+      const progressData = await getStudentProgressOverview(studentId);
+      setProgressOverview(progressData);
+      
+      // Load enrollments - filter for passed aptitude tests
+      const enrollmentsData = await getStudentEnrollments(studentId, { 
+        isEnrolled: true
+      });
+      
+      // Store all enrollments, even those without passed aptitude tests
       setEnrollments(enrollmentsData);
       
       // Load classes
@@ -110,20 +130,25 @@ export default function DashboardPage() {
         
         for (const classItem of classesData) {
           const classSubjects = await getClassSubjects(classItem._id);
-          allSubjects = [...allSubjects, ...classSubjects];
+          
+          // Filter subjects that student is enrolled in (regardless of aptitude test status)
+          const enrolledSubjectIds = enrollmentsData
+            .filter((enrollment: any) => 
+              enrollment.classId._id === classItem._id || 
+              enrollment.classId === classItem._id
+            )
+            .map((enrollment: any) => 
+              enrollment.subjectId._id || enrollment.subjectId
+            );
+          
+          const enrolledSubjects = classSubjects.filter((subject: any) => 
+            enrolledSubjectIds.includes(subject._id)
+          );
+          
+          allSubjects = [...allSubjects, ...enrolledSubjects];
         }
         
         setSubjects(allSubjects);
-        
-        // Try to load progress from the API, fallback to mock data
-        try {
-          const progressData = await getStudentProgressOverview(studentId);
-          setProgressOverview(progressData);
-        } catch (err) {
-          console.log('Progress API failed, using mock data');
-          const mockProgressData = await getStudentProgress(studentId, allSubjects);
-          setProgressOverview(mockProgressData);
-        }
       }
       
       setLoading(false);
@@ -172,20 +197,37 @@ export default function DashboardPage() {
     );
   }
   
+  // Filter subjects for display - only show subjects that have passed aptitude tests
+  const passedSubjects = subjects.filter(subject => {
+    const enrollment = enrollments.find((e: any) => 
+      (e.subjectId._id === subject._id || e.subjectId === subject._id) && 
+      e.aptitudeTestPassed === true
+    );
+    return !!enrollment;
+  });
+  
   // No enrollments or not passed any aptitude tests
-  if (!enrollments || enrollments.length === 0 || !subjects || subjects.length === 0) {
+  if (!enrollments?.length || !passedSubjects?.length) {
     return (
       <div className="container mx-auto py-10">
         <Card>
           <CardHeader>
             <CardTitle className="text-center">Welcome to Your Learning Dashboard</CardTitle>
             <CardDescription className="text-center">
-              It looks like you don't have any active enrollments yet or haven't passed any aptitude tests.
+              {enrollments?.length > 0 
+                ? "You're enrolled, but you need to pass your aptitude tests to access course materials."
+                : "It looks like you don't have any active enrollments yet."
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center p-10">
             <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-center mb-4">Please contact your administrator to get enrolled in courses or take your pending aptitude tests.</p>
+            <p className="text-center mb-4">
+              {enrollments?.length > 0 
+                ? "Please complete your aptitude tests to unlock your course content."
+                : "Please contact your administrator to get enrolled in courses."
+              }
+            </p>
             <Button onClick={() => router.push('/aptitude-test')}>Go to Aptitude Tests</Button>
           </CardContent>
         </Card>
@@ -315,19 +357,48 @@ export default function DashboardPage() {
             <TabsContent value="subjects" className="space-y-4 pt-4">
               <h2 className="text-xl font-semibold">Your Subjects</h2>
               
-              {/* Subject cards */}
+              {/* Subject cards - only show passed subjects */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {subjects.map((subject) => (
+                {passedSubjects.map((subject) => (
                   <SubjectCard 
                     key={subject._id} 
                     subject={subject} 
                     enrollment={enrollments.find((e: any) => 
-                      (e.subjectId?._id === subject._id) || (e.subjectId === subject._id)
+                      (e.subjectId._id === subject._id || e.subjectId === subject._id) &&
+                      e.aptitudeTestPassed === true
                     )}
                     progressData={progressOverview}
                   />
                 ))}
               </div>
+              
+              {/* Show message if there are enrolled subjects that need aptitude tests */}
+              {subjects.length > passedSubjects.length && (
+                <Card className="mt-4 bg-amber-50 border-amber-200">
+                  <CardContent className="pt-6">
+                    <div className="flex gap-4 items-start">
+                      <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
+                      <div>
+                        <h3 className="font-medium text-amber-800">Complete Aptitude Tests</h3>
+                        <p className="text-sm text-amber-700 mt-1">
+                          You have {subjects.length - passedSubjects.length} enrolled 
+                          {subjects.length - passedSubjects.length === 1 ? ' subject' : ' subjects'} that 
+                          {subjects.length - passedSubjects.length === 1 ? ' requires' : ' require'} passing 
+                          an aptitude test before you can access the content.
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-2 bg-white hover:bg-white"
+                          onClick={() => router.push('/aptitude-test')}
+                        >
+                          Take Aptitude Tests
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
             
             <TabsContent value="recent" className="space-y-4 pt-4">
@@ -340,8 +411,8 @@ export default function DashboardPage() {
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Course Materials</h2>
             <CourseCards 
-              subjects={subjects} 
-              enrollments={enrollments}
+              subjects={passedSubjects} 
+              enrollments={enrollments.filter((e: any) => e.aptitudeTestPassed === true)}
               studentId={user?._id}
             />
           </div>
@@ -352,8 +423,8 @@ export default function DashboardPage() {
           {/* Progress Overview */}
           <ProgressOverviewCard 
             progressData={progressOverview}
-            subjects={subjects}
-            enrollments={enrollments}
+            subjects={passedSubjects}
+            enrollments={enrollments.filter((e: any) => e.aptitudeTestPassed === true)}
           />
           
           {/* Upcoming Assessments */}
@@ -373,13 +444,10 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-center gap-2">
                       <Book className="h-4 w-4 text-primary" />
-                      <span>{classItem.displayName || classItem.name}</span>
+                      <span>{classItem.displayName}</span>
                     </div>
                     <Badge variant="outline">
-                      {subjects.filter((s) => 
-                        s.classId === classItem._id || 
-                        (typeof s.classId === 'object' && s.classId?._id === classItem._id)
-                      ).length} subjects
+                      {passedSubjects.filter((s) => s.classId === classItem._id).length} subjects
                     </Badge>
                   </div>
                 ))}

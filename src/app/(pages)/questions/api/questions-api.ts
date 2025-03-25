@@ -9,7 +9,7 @@ interface QuestionData {
     text: string;
     isCorrect: boolean;
   }[];
-  type: "mcq" | "truefalse" | "essay";
+  type: "mcq" | "true-false" | "essay";
   difficultyLevel: "beginner" | "intermediate" | "advanced";
   subjectId: string;
   points: number;
@@ -126,7 +126,7 @@ export const deleteQuestion = async (id: string) => {
 export const getQuestionTypes = () => {
   return [
     { value: "mcq", label: "Multiple Choice Question" },
-    { value: "truefalse", label: "True/False Question" },
+    { value: "true-false", label: "True/False Question" },
     { value: "essay", label: "Essay Question" }
   ];
 };

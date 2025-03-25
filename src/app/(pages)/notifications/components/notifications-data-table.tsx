@@ -1,4 +1,4 @@
-// app/dashboard/questions/components/questions-data-table.tsx
+// app/dashboard/notifications/components/notifications-data-table.tsx
 "use client";
 
 import { useState } from "react";
@@ -16,11 +16,11 @@ import {
 } from "@tanstack/react-table";
 import {
   ArrowUpDown,
+  CheckCircle,
   ChevronDown,
+  Eye,
   MoreHorizontal,
-  Pencil,
-  Trash,
-  Eye
+  Trash
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -54,59 +54,63 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog";
-import { deleteQuestion } from "../api/questions-api";
-
-// Question interface
-interface Question {
-  _id: string;
-  text: string;
-  options: {
-    text: string;
-    isCorrect: boolean;
-  }[];
-  type: string;
-  difficultyLevel: string;
-  subjectId: string;
-  points: number;
-}
+  deleteNotification,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  Notification,
+  NotificationPriority
+} from "../api/notifications-api";
+import { format } from "date-fns";
 
 // Props interface
-interface QuestionsDataTableProps {
-  data: Question[];
+interface NotificationsDataTableProps {
+  data: Notification[];
   isLoading: boolean;
-  onEdit: (question: Question) => void;
   onRefresh: () => void;
   onError: (error: Error) => void;
   onSuccess: (message: string) => void;
 }
 
-export function QuestionsDataTable({
+export function NotificationsDataTable({
   data,
   isLoading,
-  onEdit,
   onRefresh,
   onError,
   onSuccess
-}: QuestionsDataTableProps) {
+}: NotificationsDataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [questionToDelete, setQuestionToDelete] = useState<Question | null>(
-    null
-  );
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [questionToView, setQuestionToView] = useState<Question | null>(null);
+  const [notificationToDelete, setNotificationToDelete] =
+    useState<Notification | null>(null);
+
+  // Helper function to format date
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), "PPP p");
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  // Helper function to get priority badge color
+  const getPriorityColor = (priority: NotificationPriority) => {
+    switch (priority) {
+      case NotificationPriority.HIGH:
+        return "bg-red-100 text-red-800";
+      case NotificationPriority.MEDIUM:
+        return "bg-yellow-100 text-yellow-800";
+      case NotificationPriority.LOW:
+        return "bg-green-100 text-green-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
 
   // Define table columns
-  const columns: ColumnDef<Question>[] = [
+  const columns: ColumnDef<Notification>[] = [
     {
       id: "select",
       header: ({ table }) => (
@@ -130,20 +134,33 @@ export function QuestionsDataTable({
       enableHiding: false
     },
     {
-      accessorKey: "text",
+      accessorKey: "title",
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Question Text
+            Title
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         );
       },
       cell: ({ row }) => (
-        <div className="max-w-md truncate">{row.getValue("text")}</div>
+        <div className="font-medium">
+          {row.original.isRead ? (
+            row.getValue("title")
+          ) : (
+            <span className="font-bold">{row.getValue("title")}</span>
+          )}
+        </div>
+      )
+    },
+    {
+      accessorKey: "content",
+      header: "Content",
+      cell: ({ row }) => (
+        <div className="max-w-[300px] truncate">{row.getValue("content")}</div>
       )
     },
     {
@@ -152,21 +169,8 @@ export function QuestionsDataTable({
       cell: ({ row }) => {
         const type = row.getValue("type") as string;
         return (
-          <Badge
-            variant="outline"
-            className={
-              type === "mcq"
-                ? "bg-blue-100 text-blue-800"
-                : type === "true-false"
-                ? "bg-green-100 text-green-800"
-                : "bg-purple-100 text-purple-800"
-            }
-          >
-            {type === "mcq"
-              ? "Multiple Choice"
-              : type === "true-false"
-              ? "True/False"
-              : "Essay"}
+          <Badge variant="outline">
+            {type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()}
           </Badge>
         );
       },
@@ -175,47 +179,48 @@ export function QuestionsDataTable({
       }
     },
     {
-      accessorKey: "difficultyLevel",
-      header: "Difficulty",
+      accessorKey: "priority",
+      header: "Priority",
       cell: ({ row }) => {
-        const difficulty = row.getValue("difficultyLevel") as string;
+        const priority = row.getValue("priority") as NotificationPriority;
         return (
-          <Badge
-            variant="outline"
-            className={
-              difficulty === "beginner"
-                ? "bg-green-100 text-green-800"
-                : difficulty === "intermediate"
-                ? "bg-yellow-100 text-yellow-800"
-                : "bg-red-100 text-red-800"
-            }
-          >
-            {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+          <Badge variant="outline" className={getPriorityColor(priority)}>
+            {priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()}
           </Badge>
         );
       }
     },
     {
-      accessorKey: "points",
+      accessorKey: "isRead",
+      header: "Status",
+      cell: ({ row }) => {
+        const isRead = row.getValue("isRead") as boolean;
+        return (
+          <Badge variant={isRead ? "outline" : "default"}>
+            {isRead ? "Read" : "Unread"}
+          </Badge>
+        );
+      }
+    },
+    {
+      accessorKey: "createdAt",
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Points
+            Date
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         );
       },
-      cell: ({ row }) => (
-        <div className="text-center">{row.getValue("points")}</div>
-      )
+      cell: ({ row }) => <div>{formatDate(row.original.createdAt)}</div>
     },
     {
       id: "actions",
       cell: ({ row }) => {
-        const question = row.original;
+        const notification = row.original;
 
         return (
           <DropdownMenu>
@@ -228,22 +233,26 @@ export function QuestionsDataTable({
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem
-                onClick={() => {
-                  setQuestionToView(question);
-                  setViewDialogOpen(true);
+                onClick={async () => {
+                  try {
+                    if (!notification.isRead) {
+                      await markNotificationAsRead(notification._id);
+                      onSuccess("Notification marked as read");
+                      onRefresh();
+                    }
+                  } catch (error) {
+                    onError(error as Error);
+                  }
                 }}
+                disabled={notification.isRead}
               >
                 <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(question)}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
+                Mark as Read
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => {
-                  setQuestionToDelete(question);
+                  setNotificationToDelete(notification);
                   setDeleteDialogOpen(true);
                 }}
                 className="text-red-600"
@@ -277,18 +286,28 @@ export function QuestionsDataTable({
     }
   });
 
-  const handleDeleteQuestion = async () => {
-    if (!questionToDelete) return;
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllNotificationsAsRead();
+      onSuccess("All notifications marked as read");
+      onRefresh();
+    } catch (error) {
+      onError(error as Error);
+    }
+  };
+
+  const handleDeleteNotification = async () => {
+    if (!notificationToDelete) return;
 
     try {
-      await deleteQuestion(questionToDelete._id);
-      onSuccess("Question deleted successfully");
-      onRefresh(); // Refresh data
+      await deleteNotification(notificationToDelete._id);
+      onSuccess("Notification deleted successfully");
+      onRefresh();
     } catch (error) {
       onError(error as Error);
     } finally {
       setDeleteDialogOpen(false);
-      setQuestionToDelete(null);
+      setNotificationToDelete(null);
     }
   };
 
@@ -303,31 +322,37 @@ export function QuestionsDataTable({
 
   return (
     <div>
-      <div className="flex items-center py-4">
+      <div className="flex items-center justify-between py-4">
         <Input
-          placeholder="Filter questions..."
-          value={(table.getColumn("text")?.getFilterValue() as string) ?? ""}
+          placeholder="Filter by title..."
+          value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
-            table.getColumn("text")?.setFilterValue(event.target.value)
+            table.getColumn("title")?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
+        <Button variant="outline" onClick={handleMarkAllAsRead}>
+          <CheckCircle className="mr-2 h-4 w-4" />
+          Mark All as Read
+        </Button>
       </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>
@@ -337,6 +362,7 @@ export function QuestionsDataTable({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className={row.original.isRead ? "" : "bg-muted/20"}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -354,7 +380,7 @@ export function QuestionsDataTable({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No results found.
+                  No notifications found.
                 </TableCell>
               </TableRow>
             )}
@@ -390,14 +416,15 @@ export function QuestionsDataTable({
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the question. This action cannot be
-              undone.
+              This will permanently delete the notification{" "}
+              <strong>{notificationToDelete?.title}</strong>. This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteQuestion}
+              onClick={handleDeleteNotification}
               className="bg-red-600 hover:bg-red-700"
             >
               Delete
@@ -405,106 +432,6 @@ export function QuestionsDataTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* View Question Dialog */}
-      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Question Details</DialogTitle>
-            <DialogDescription>
-              View all details for this question.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-            {questionToView && (
-              <>
-                <div>
-                  <h3 className="font-medium text-lg">Question</h3>
-                  <p className="mt-1">{questionToView.text}</p>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-lg">Type</h3>
-                  <Badge
-                    variant="outline"
-                    className={
-                      questionToView.type === "mcq"
-                        ? "bg-blue-100 text-blue-800"
-                        : questionToView.type === "true-false"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-purple-100 text-purple-800"
-                    }
-                  >
-                    {questionToView.type === "mcq"
-                      ? "Multiple Choice"
-                      : questionToView.type === "true-false"
-                      ? "True/False"
-                      : "Essay"}
-                  </Badge>
-                </div>
-
-                {questionToView.options &&
-                  questionToView.options.length > 0 && (
-                    <div>
-                      <h3 className="font-medium text-lg">Options</h3>
-                      <ul className="mt-1 space-y-2">
-                        {questionToView.options.map((option, index) => (
-                          <li
-                            key={index}
-                            className={`flex items-center space-x-2 p-2 rounded ${
-                              option.isCorrect
-                                ? "bg-green-50 border border-green-200"
-                                : "bg-gray-50 border border-gray-200"
-                            }`}
-                          >
-                            <span
-                              className={`w-6 h-6 flex items-center justify-center rounded-full text-xs ${
-                                option.isCorrect
-                                  ? "bg-green-500 text-white"
-                                  : "bg-gray-200"
-                              }`}
-                            >
-                              {index + 1}
-                            </span>
-                            <span>{option.text}</span>
-                            {option.isCorrect && (
-                              <Badge className="ml-auto bg-green-500">
-                                Correct
-                              </Badge>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="font-medium">Difficulty Level</h3>
-                    <Badge
-                      variant="outline"
-                      className={
-                        questionToView.difficultyLevel === "beginner"
-                          ? "bg-green-100 text-green-800"
-                          : questionToView.difficultyLevel === "intermediate"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-red-100 text-red-800"
-                      }
-                    >
-                      {questionToView.difficultyLevel.charAt(0).toUpperCase() +
-                        questionToView.difficultyLevel.slice(1)}
-                    </Badge>
-                  </div>
-                  <div>
-                    <h3 className="font-medium">Points</h3>
-                    <p>{questionToView.points}</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

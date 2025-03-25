@@ -1,4 +1,4 @@
-// app/dashboard/questions/components/questions-data-table.tsx
+// app/dashboard/assessment-templates/components/assessment-templates-data-table.tsx
 "use client";
 
 import { useState } from "react";
@@ -17,10 +17,11 @@ import {
 import {
   ArrowUpDown,
   ChevronDown,
+  Copy,
   MoreHorizontal,
   Pencil,
-  Trash,
-  Eye
+  Play,
+  Trash
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -54,59 +55,43 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog";
-import { deleteQuestion } from "../api/questions-api";
-
-// Question interface
-interface Question {
-  _id: string;
-  text: string;
-  options: {
-    text: string;
-    isCorrect: boolean;
-  }[];
-  type: string;
-  difficultyLevel: string;
-  subjectId: string;
-  points: number;
-}
+  deleteAssessmentTemplate,
+  generateAssessment
+} from "../api/assessment-templates-api";
+import { AssessmentTemplate } from "../hooks/use-assessment-templates";
 
 // Props interface
-interface QuestionsDataTableProps {
-  data: Question[];
+interface AssessmentTemplatesDataTableProps {
+  data: AssessmentTemplate[];
   isLoading: boolean;
-  onEdit: (question: Question) => void;
+  onEdit: (template: AssessmentTemplate) => void;
   onRefresh: () => void;
   onError: (error: Error) => void;
   onSuccess: (message: string) => void;
 }
 
-export function QuestionsDataTable({
+export function AssessmentTemplatesDataTable({
   data,
   isLoading,
   onEdit,
   onRefresh,
   onError,
   onSuccess
-}: QuestionsDataTableProps) {
+}: AssessmentTemplatesDataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [questionToDelete, setQuestionToDelete] = useState<Question | null>(
-    null
-  );
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [questionToView, setQuestionToView] = useState<Question | null>(null);
+  const [templateToDelete, setTemplateToDelete] =
+    useState<AssessmentTemplate | null>(null);
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
+  const [templateToGenerate, setTemplateToGenerate] =
+    useState<AssessmentTemplate | null>(null);
+  const [studentId, setStudentId] = useState("");
 
   // Define table columns
-  const columns: ColumnDef<Question>[] = [
+  const columns: ColumnDef<AssessmentTemplate>[] = [
     {
       id: "select",
       header: ({ table }) => (
@@ -130,20 +115,20 @@ export function QuestionsDataTable({
       enableHiding: false
     },
     {
-      accessorKey: "text",
+      accessorKey: "title",
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Question Text
+            Title
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         );
       },
       cell: ({ row }) => (
-        <div className="max-w-md truncate">{row.getValue("text")}</div>
+        <div className="font-medium">{row.getValue("title")}</div>
       )
     },
     {
@@ -155,18 +140,19 @@ export function QuestionsDataTable({
           <Badge
             variant="outline"
             className={
-              type === "mcq"
+              type === "aptitude"
                 ? "bg-blue-100 text-blue-800"
-                : type === "true-false"
+                : type === "lecture-activity"
                 ? "bg-green-100 text-green-800"
-                : "bg-purple-100 text-purple-800"
+                : type === "chapter-test"
+                ? "bg-purple-100 text-purple-800"
+                : "bg-red-100 text-red-800"
             }
           >
-            {type === "mcq"
-              ? "Multiple Choice"
-              : type === "true-false"
-              ? "True/False"
-              : "Essay"}
+            {type
+              .split("-")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ")}
           </Badge>
         );
       },
@@ -175,47 +161,44 @@ export function QuestionsDataTable({
       }
     },
     {
-      accessorKey: "difficultyLevel",
-      header: "Difficulty",
+      accessorKey: "questionCriteria.totalQuestions",
+      header: "Questions",
+      cell: ({ row }) => (
+        <div className="text-center">
+          {row.getValue("questionCriteria.totalQuestions")}
+        </div>
+      )
+    },
+    {
+      accessorKey: "totalPoints",
+      header: "Points",
+      cell: ({ row }) => (
+        <div className="text-center">{row.getValue("totalPoints")}</div>
+      )
+    },
+    {
+      accessorKey: "passingScore",
+      header: "Passing Score",
+      cell: ({ row }) => (
+        <div className="text-center">{row.getValue("passingScore")}%</div>
+      )
+    },
+    {
+      accessorKey: "settings.isPublished",
+      header: "Status",
       cell: ({ row }) => {
-        const difficulty = row.getValue("difficultyLevel") as string;
+        const isPublished = row.getValue("settings.isPublished") as boolean;
         return (
-          <Badge
-            variant="outline"
-            className={
-              difficulty === "beginner"
-                ? "bg-green-100 text-green-800"
-                : difficulty === "intermediate"
-                ? "bg-yellow-100 text-yellow-800"
-                : "bg-red-100 text-red-800"
-            }
-          >
-            {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+          <Badge variant={isPublished ? "default" : "outline"}>
+            {isPublished ? "Published" : "Draft"}
           </Badge>
         );
       }
     },
     {
-      accessorKey: "points",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Points
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        );
-      },
-      cell: ({ row }) => (
-        <div className="text-center">{row.getValue("points")}</div>
-      )
-    },
-    {
       id: "actions",
       cell: ({ row }) => {
-        const question = row.original;
+        const template = row.original;
 
         return (
           <DropdownMenu>
@@ -227,23 +210,23 @@ export function QuestionsDataTable({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => {
-                  setQuestionToView(question);
-                  setViewDialogOpen(true);
-                }}
-              >
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(question)}>
+              <DropdownMenuItem onClick={() => onEdit(template)}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setTemplateToGenerate(template);
+                  setGenerateDialogOpen(true);
+                }}
+              >
+                <Play className="mr-2 h-4 w-4" />
+                Generate Assessment
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => {
-                  setQuestionToDelete(question);
+                  setTemplateToDelete(template);
                   setDeleteDialogOpen(true);
                 }}
                 className="text-red-600"
@@ -277,18 +260,33 @@ export function QuestionsDataTable({
     }
   });
 
-  const handleDeleteQuestion = async () => {
-    if (!questionToDelete) return;
+  const handleDeleteTemplate = async () => {
+    if (!templateToDelete) return;
 
     try {
-      await deleteQuestion(questionToDelete._id);
-      onSuccess("Question deleted successfully");
+      await deleteAssessmentTemplate(templateToDelete._id);
+      onSuccess("Template deleted successfully");
       onRefresh(); // Refresh data
     } catch (error) {
       onError(error as Error);
     } finally {
       setDeleteDialogOpen(false);
-      setQuestionToDelete(null);
+      setTemplateToDelete(null);
+    }
+  };
+
+  const handleGenerateAssessment = async () => {
+    if (!templateToGenerate || !studentId) return;
+
+    try {
+      await generateAssessment(templateToGenerate._id, studentId);
+      onSuccess("Assessment generated successfully");
+    } catch (error) {
+      onError(error as Error);
+    } finally {
+      setGenerateDialogOpen(false);
+      setTemplateToGenerate(null);
+      setStudentId("");
     }
   };
 
@@ -305,10 +303,10 @@ export function QuestionsDataTable({
     <div>
       <div className="flex items-center py-4">
         <Input
-          placeholder="Filter questions..."
-          value={(table.getColumn("text")?.getFilterValue() as string) ?? ""}
+          placeholder="Filter by title..."
+          value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
-            table.getColumn("text")?.setFilterValue(event.target.value)
+            table.getColumn("title")?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
@@ -318,16 +316,18 @@ export function QuestionsDataTable({
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>
@@ -390,14 +390,15 @@ export function QuestionsDataTable({
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the question. This action cannot be
+              This will permanently delete the template{" "}
+              <strong>{templateToDelete?.title}</strong>. This action cannot be
               undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteQuestion}
+              onClick={handleDeleteTemplate}
               className="bg-red-600 hover:bg-red-700"
             >
               Delete
@@ -406,105 +407,47 @@ export function QuestionsDataTable({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* View Question Dialog */}
-      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Question Details</DialogTitle>
-            <DialogDescription>
-              View all details for this question.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-            {questionToView && (
-              <>
-                <div>
-                  <h3 className="font-medium text-lg">Question</h3>
-                  <p className="mt-1">{questionToView.text}</p>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-lg">Type</h3>
-                  <Badge
-                    variant="outline"
-                    className={
-                      questionToView.type === "mcq"
-                        ? "bg-blue-100 text-blue-800"
-                        : questionToView.type === "true-false"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-purple-100 text-purple-800"
-                    }
-                  >
-                    {questionToView.type === "mcq"
-                      ? "Multiple Choice"
-                      : questionToView.type === "true-false"
-                      ? "True/False"
-                      : "Essay"}
-                  </Badge>
-                </div>
-
-                {questionToView.options &&
-                  questionToView.options.length > 0 && (
-                    <div>
-                      <h3 className="font-medium text-lg">Options</h3>
-                      <ul className="mt-1 space-y-2">
-                        {questionToView.options.map((option, index) => (
-                          <li
-                            key={index}
-                            className={`flex items-center space-x-2 p-2 rounded ${
-                              option.isCorrect
-                                ? "bg-green-50 border border-green-200"
-                                : "bg-gray-50 border border-gray-200"
-                            }`}
-                          >
-                            <span
-                              className={`w-6 h-6 flex items-center justify-center rounded-full text-xs ${
-                                option.isCorrect
-                                  ? "bg-green-500 text-white"
-                                  : "bg-gray-200"
-                              }`}
-                            >
-                              {index + 1}
-                            </span>
-                            <span>{option.text}</span>
-                            {option.isCorrect && (
-                              <Badge className="ml-auto bg-green-500">
-                                Correct
-                              </Badge>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="font-medium">Difficulty Level</h3>
-                    <Badge
-                      variant="outline"
-                      className={
-                        questionToView.difficultyLevel === "beginner"
-                          ? "bg-green-100 text-green-800"
-                          : questionToView.difficultyLevel === "intermediate"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-red-100 text-red-800"
-                      }
-                    >
-                      {questionToView.difficultyLevel.charAt(0).toUpperCase() +
-                        questionToView.difficultyLevel.slice(1)}
-                    </Badge>
-                  </div>
-                  <div>
-                    <h3 className="font-medium">Points</h3>
-                    <p>{questionToView.points}</p>
-                  </div>
-                </div>
-              </>
-            )}
+      {/* Generate Assessment Dialog */}
+      <AlertDialog
+        open={generateDialogOpen}
+        onOpenChange={setGenerateDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate Assessment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Generate an assessment from template{" "}
+              <strong>{templateToGenerate?.title}</strong> for a specific
+              student.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="studentId" className="text-sm font-medium">
+                  Student ID
+                </label>
+                <Input
+                  id="studentId"
+                  placeholder="Enter student ID"
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleGenerateAssessment}
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={!studentId}
+            >
+              Generate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

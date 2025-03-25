@@ -1,12 +1,12 @@
-// app/dashboard/questions/page.tsx
+// app/dashboard/feature-flags/page.tsx
 "use client";
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { QuestionsDataTable } from "./components/questions-data-table";
-import { QuestionForm } from "./components/question-form";
+import { FeatureFlagsDataTable } from "./components/feature-flags-data-table";
+import { FeatureFlagForm } from "./components/feature-flag-form";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, RefreshCw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContentLayout } from "@/components/admin-panel/content-layout";
 
@@ -17,36 +17,33 @@ import {
   CardHeader,
   CardTitle
 } from "@/components/ui/card";
-import { useQuestions } from "./hooks/use-questions";
+import { useFeatureFlags } from "./hooks/use-feature-flags";
 
-// Question interface matching our API
-interface Question {
+// Feature Flag interface
+interface FeatureFlag {
   _id: string;
-  text: string;
-  options: {
-    text: string;
-    isCorrect: boolean;
-  }[];
-  type: string;
-  difficultyLevel: string;
-  subjectId: string;
-  points: number;
+  key: string;
+  value: boolean;
+  type: "global" | "user" | "role";
+  description: string;
+  scope?: string;
+  metadata?: Record<string, any>;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export default function QuestionsPage() {
+export default function FeatureFlagsPage() {
   const [open, setOpen] = useState(false);
-  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(
-    null
-  );
-  const { questions, isLoading, error, mutate } = useQuestions();
+  const [selectedFlag, setSelectedFlag] = useState<FeatureFlag | null>(null);
+  const { featureFlags, isLoading, error, mutate } = useFeatureFlags();
 
-  const handleAddQuestion = () => {
-    setSelectedQuestion(null);
+  const handleAddFlag = () => {
+    setSelectedFlag(null);
     setOpen(true);
   };
 
-  const handleEditQuestion = (question: Question) => {
-    setSelectedQuestion(question);
+  const handleEditFlag = (flag: FeatureFlag) => {
+    setSelectedFlag(flag);
     setOpen(true);
   };
 
@@ -69,14 +66,14 @@ export default function QuestionsPage() {
     toast.error(errorMessage);
   };
 
-  // Show error toast if there's an error loading questions
+  // Show error toast if there's an error loading feature flags
   if (error) {
     // Only show this once
     if (
       typeof window !== "undefined" &&
       !window.localStorage.getItem("error-shown")
     ) {
-      toast.error(error.message || "Failed to load questions data");
+      toast.error(error.message || "Failed to load feature flags data");
       window.localStorage.setItem("error-shown", "true");
 
       // Clear after 5 seconds to allow showing again if needed
@@ -87,37 +84,43 @@ export default function QuestionsPage() {
   }
 
   return (
-    <ContentLayout title="Question Management">
+    <ContentLayout title="Feature Flag Management">
       <div className="container-lg mx-auto py-6">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-bold">Question Management</h1>
-          <Button onClick={handleAddQuestion}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Question
-          </Button>
+          <h1 className="text-3xl font-bold">Feature Flag Management</h1>
+          <div className="flex space-x-2">
+            <Button variant="outline" onClick={() => mutate()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+            <Button onClick={handleAddFlag}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Flag
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="all">
           <TabsList>
-            <TabsTrigger value="all">All Questions</TabsTrigger>
-            <TabsTrigger value="mcq">Multiple Choice</TabsTrigger>
-            <TabsTrigger value="true-false">True/False</TabsTrigger>
-            <TabsTrigger value="essay">Essay</TabsTrigger>
+            <TabsTrigger value="all">All Flags</TabsTrigger>
+            <TabsTrigger value="global">Global</TabsTrigger>
+            <TabsTrigger value="user">User-Specific</TabsTrigger>
+            <TabsTrigger value="role">Role-Specific</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>All Questions</CardTitle>
+                <CardTitle>All Feature Flags</CardTitle>
                 <CardDescription>
-                  Manage all questions in the question bank
+                  Manage all feature flags in the system
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <QuestionsDataTable
-                  data={questions || []}
+                <FeatureFlagsDataTable
+                  data={featureFlags || []}
                   isLoading={isLoading}
-                  onEdit={handleEditQuestion}
+                  onEdit={handleEditFlag}
                   onRefresh={mutate}
                   onError={handleError}
                   onSuccess={(message: string) => toast.success(message)}
@@ -126,21 +129,21 @@ export default function QuestionsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="mcq" className="mt-4">
+          <TabsContent value="global" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Multiple Choice Questions</CardTitle>
+                <CardTitle>Global Feature Flags</CardTitle>
                 <CardDescription>
-                  Manage multiple choice questions
+                  Manage system-wide feature flags
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <QuestionsDataTable
-                  data={(questions || []).filter(
-                    (question) => question.type === "mcq"
+                <FeatureFlagsDataTable
+                  data={(featureFlags || []).filter(
+                    (flag) => flag.type === "global"
                   )}
                   isLoading={isLoading}
-                  onEdit={handleEditQuestion}
+                  onEdit={handleEditFlag}
                   onRefresh={mutate}
                   onError={handleError}
                   onSuccess={(message: string) => toast.success(message)}
@@ -149,19 +152,21 @@ export default function QuestionsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="true-false" className="mt-4">
+          <TabsContent value="user" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>True/False Questions</CardTitle>
-                <CardDescription>Manage true/false questions</CardDescription>
+                <CardTitle>User-Specific Flags</CardTitle>
+                <CardDescription>
+                  Manage feature flags for specific users
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <QuestionsDataTable
-                  data={(questions || []).filter(
-                    (question) => question.type === "true-false"
+                <FeatureFlagsDataTable
+                  data={(featureFlags || []).filter(
+                    (flag) => flag.type === "user"
                   )}
                   isLoading={isLoading}
-                  onEdit={handleEditQuestion}
+                  onEdit={handleEditFlag}
                   onRefresh={mutate}
                   onError={handleError}
                   onSuccess={(message: string) => toast.success(message)}
@@ -170,19 +175,21 @@ export default function QuestionsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="essay" className="mt-4">
+          <TabsContent value="role" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Essay Questions</CardTitle>
-                <CardDescription>Manage essay questions</CardDescription>
+                <CardTitle>Role-Specific Flags</CardTitle>
+                <CardDescription>
+                  Manage feature flags for specific roles
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <QuestionsDataTable
-                  data={(questions || []).filter(
-                    (question) => question.type === "essay"
+                <FeatureFlagsDataTable
+                  data={(featureFlags || []).filter(
+                    (flag) => flag.type === "role"
                   )}
                   isLoading={isLoading}
-                  onEdit={handleEditQuestion}
+                  onEdit={handleEditFlag}
                   onRefresh={mutate}
                   onError={handleError}
                   onSuccess={(message: string) => toast.success(message)}
@@ -192,10 +199,10 @@ export default function QuestionsPage() {
           </TabsContent>
         </Tabs>
 
-        <QuestionForm
+        <FeatureFlagForm
           open={open}
           setOpen={setOpen}
-          question={selectedQuestion}
+          flag={selectedFlag}
           onSuccess={handleSuccess}
           onError={handleError}
         />

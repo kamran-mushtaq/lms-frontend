@@ -95,116 +95,101 @@ export const assignAptitudeTests = async (studentId: string) => {
 // Submit assessment result - Complete fixed version
 // Submit assessment result - Postman-verified version
 export const submitAssessmentResult = async (studentId: string, resultPayload: any) => {
-  try {
-    // Validate student ID
-    if (!studentId || typeof studentId !== 'string') {
-      throw new Error('Invalid student ID provided');
-    }
-    
-    // Validate assessment result payload
-    if (!resultPayload || typeof resultPayload !== 'object') {
-      throw new Error('Invalid assessment result payload');
-    }
-    
-    // Check essential fields
-    const requiredFields = [
-      'assessmentId', 
-      'classId', 
-      'totalScore', 
-      'maxPossibleScore',
-      'questionResponses'
-    ];
-    
-    const missingFields = requiredFields.filter(field => !resultPayload[field]);
-    
-    if (missingFields.length > 0) {
-      throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
-    }
-    
-    // Enhanced logging to help diagnose the issue
-    console.log('------------- ASSESSMENT RESULT SUBMISSION -------------');
-    console.log('Student ID:', studentId);
-    console.log('API Endpoint:', `/assessment-results/${studentId}`);
-    console.log('Payload:', JSON.stringify(resultPayload, null, 2));
-    
-    // Make API request to submit assessment result
-    const response = await apiClient.post(`/assessment-results/${studentId}`, resultPayload);
-    
-    console.log('Assessment result submission response:', response.data);
-    
-    // After submitting the assessment, update the enrollment status if it's an aptitude test
-    if (response.data && response.data._id) {
-      try {
-        // Calculate passing based on percentageScore
-        const totalScore = resultPayload.totalScore;
-        const maxPossibleScore = resultPayload.maxPossibleScore;
-        const percentageScore = (totalScore / maxPossibleScore) * 100;
-        
-        // Get passing score from assessment or use default 60%
-        const passingScore = response.data.assessment?.passingScore || 60;
-        const passed = percentageScore >= passingScore;
-        
-        console.log('Attempting to update enrollment status:', {
-          studentId,
-          resultId: response.data._id,
-          percentageScore,
-          passingScore,
-          passed: passed.toString()  // Explicitly convert to string
-        });
-        
-        // IMPORTANT: Making sure we pass a string 'true' or 'false' explicitly
-        const passedString = passed ? 'true' : 'false';
-        
-        // Call the enrollment status update endpoint with explicit string parameter
-        const updateUrl = `/enrollment/update-test-status/${studentId}/${response.data._id}?passed=${passedString}`;
-        console.log('Update URL:', updateUrl);
-        
-        const updateResponse = await apiClient.put(updateUrl);
-        
-        console.log('Enrollment status update response:', updateResponse.data);
-        
-        // Verify the update was successful
-        const verifyUrl = `/enrollment/student/${studentId}/class/${resultPayload.classId}/subject/${resultPayload.subjectId}`;
-        const verifyResponse = await apiClient.get(verifyUrl);
-        
-        console.log('Verification check - enrollment status:', {
-          aptitudeTestCompleted: verifyResponse.data.aptitudeTestCompleted,
-          aptitudeTestPassed: verifyResponse.data.aptitudeTestPassed
-        });
-        
-      } catch (updateError) {
-        console.error('Error updating enrollment status:', updateError);
-        
-        if (updateError.response) {
-          console.error('Update error response:', updateError.response.data);
+    try {
+      // Validate student ID
+      if (!studentId || typeof studentId !== 'string') {
+        throw new Error('Invalid student ID provided');
+      }
+      
+      // Validate assessment result payload
+      if (!resultPayload || typeof resultPayload !== 'object') {
+        throw new Error('Invalid assessment result payload');
+      }
+      
+      // Check essential fields based on Postman success
+      const requiredFields = [
+        'assessmentId', 
+        'classId', 
+        'totalScore', 
+        'maxPossibleScore',
+        'questionResponses'
+      ];
+      
+      const missingFields = requiredFields.filter(field => !resultPayload[field]);
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+      
+      // Enhanced logging to help diagnose the issue
+      console.log('------------- ASSESSMENT RESULT SUBMISSION -------------');
+      console.log('Student ID:', studentId);
+      console.log('API Endpoint:', `/assessment-results/${studentId}`);
+      console.log('Payload:', JSON.stringify(resultPayload, null, 2));
+      
+      // Make API request with exactly the payload structure that worked in Postman
+      const response = await apiClient.post(`/assessment-results/${studentId}`, resultPayload);
+      
+      console.log('API response:', response.data);
+      
+      // After submitting the assessment, update the enrollment status if it's an aptitude test
+      if (response.data && response.data._id) {
+        try {
+          // Calculate passing based on percentageScore
+          const totalScore = resultPayload.totalScore;
+          const maxPossibleScore = resultPayload.maxPossibleScore;
+          const percentageScore = (totalScore / maxPossibleScore) * 100;
+          
+          // Get passing score from assessment or use default 60%
+          const passingScore = response.data.assessment?.passingScore || 60;
+          const passed = percentageScore >= passingScore;
+          
+          console.log('Updating enrollment status:', {
+            studentId,
+            resultId: response.data._id,
+            percentageScore,
+            passingScore,
+            passed
+          });
+          
+          // Call the enrollment status update endpoint
+          await apiClient.put(`/enrollment/update-test-status/${studentId}/${response.data._id}`, {
+            passed
+          });
+          
+          console.log('Enrollment status updated successfully');
+        } catch (updateError) {
+          console.error('Error updating enrollment status:', updateError);
+          // We don't throw here because the assessment submission was successful
         }
       }
-    }
-    
-    return response.data;
-  } catch (error) {
-    console.error('Error submitting assessment result:', error);
-    
-    // Detailed error logging
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
       
-      // Extract better error message if available
-      const errorMessage = 
-        error.response.data?.message || 
-        error.response.data?.error || 
-        'Failed to submit assessment result. Please try again later.';
+      return response.data;
+    } catch (error: any) {
+      console.error('Error submitting assessment result:', error);
       
-      throw new Error(errorMessage);
-    } else if (error.request) {
-      console.error('No response received:', error.request);
-      throw new Error('Server did not respond. Please check your connection and try again.');
-    } else {
-      throw error;
+      // Detailed error logging
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+        console.error('Response data:', error.response.data);
+        
+        // Extract better error message if available
+        const errorMessage = 
+          error.response.data?.message || 
+          error.response.data?.error || 
+          'Failed to submit assessment result. Please try again later.';
+        
+        throw new Error(errorMessage);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+        throw new Error('Server did not respond. Please check your connection and try again.');
+      } else {
+        // Propagate custom error messages from validation above
+        throw error;
+      }
     }
-  }
-};
+  };
 
 // Helper function to properly format assessment result payload
 export const createAssessmentResultPayload = (
@@ -443,213 +428,4 @@ export const checkStudentAptitudeTestRequired = async (studentId: string) => {
     console.error('Error checking aptitude test requirement:', error);
     throw new Error('Failed to check aptitude test requirement. Please try again later.');
   }
-};
-
-// Get all classes for a student
-export const getStudentClasses = async (studentId: string) => {
-  try {
-    // First get student enrollments to extract class information
-    const enrollments = await getStudentEnrollments(studentId, { isEnrolled: true });
-    
-    // Extract unique classIds from enrollments
-    const classIds = Array.from(new Set(
-      enrollments.map((enrollment: any) => enrollment.classId?._id || enrollment.classId)
-    ));
-    
-    // If no classes found, return empty array
-    if (!classIds.length) {
-      return [];
-    }
-    
-    // Fetch full class details for each class
-    const classes = await Promise.all(
-      classIds.map(async (classId: string) => {
-        try {
-          const response = await apiClient.get(`/classes/${classId}`);
-          return response.data;
-        } catch (error) {
-          console.error(`Error fetching class with ID ${classId}:`, error);
-          return null;
-        }
-      })
-    );
-    
-    // Filter out null responses and return valid classes
-    return classes.filter(Boolean);
-  } catch (error) {
-    console.error('Error fetching student classes:', error);
-    throw new Error('Failed to load student classes. Please try again later.');
-  }
-};
-
-// Get all subjects for a specific class
-export const getClassSubjects = async (classId: string) => {
-  try {
-    if (!classId) {
-      throw new Error('Class ID is required');
-    }
-    
-    const response = await apiClient.get(`/subjects/class/${classId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching class subjects:', error);
-    throw new Error('Failed to load class subjects. Please try again later.');
-  }
-};
-
-// Get student progress overview
-export const getStudentProgressOverview = async (studentId: string) => {
-  try {
-    if (!studentId) {
-      throw new Error('Student ID is required');
-    }
-    
-    const response = await apiClient.get(`/student-progress/${studentId}/overview`);
-    
-    // If backend doesn't have this endpoint implemented yet, create a placeholder response
-    if (!response.data) {
-      // Return a placeholder progress overview
-      return {
-        totalClasses: 0,
-        totalSubjects: 0,
-        totalChapters: 0,
-        completedChapters: 0,
-        overallProgress: 0,
-        averageScore: 0,
-        totalTimeSpentMinutes: 0,
-        lastAccessedAt: new Date().toISOString(),
-        activeStudyPlans: 0,
-        upcomingAssessments: 0
-      };
-    }
-    
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching student progress overview:', error);
-    
-    // If the endpoint doesn't exist yet, return a placeholder instead of throwing
-    if (error.response && error.response.status === 404) {
-      // Return a placeholder progress overview
-      return {
-        totalClasses: 0,
-        totalSubjects: 0,
-        totalChapters: 0,
-        completedChapters: 0,
-        overallProgress: 0,
-        averageScore: 0,
-        totalTimeSpentMinutes: 0,
-        lastAccessedAt: new Date().toISOString(),
-        activeStudyPlans: 0,
-        upcomingAssessments: 0
-      };
-    }
-    
-    throw new Error('Failed to load student progress. Please try again later.');
-  }
-};
-
-// Get chapters for a subject
-export const getSubjectChapters = async (subjectId: string) => {
-  try {
-    if (!subjectId) {
-      throw new Error('Subject ID is required');
-    }
-    
-    const response = await apiClient.get(`/chapters/subject/${subjectId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching subject chapters:', error);
-    
-    // If endpoint doesn't exist yet, return empty array
-    if (error.response && error.response.status === 404) {
-      return [];
-    }
-    
-    throw new Error('Failed to load subject chapters. Please try again later.');
-  }
-};
-
-// Get student progress for a specific subject
-export const getStudentSubjectProgress = async (studentId: string, subjectId: string) => {
-  try {
-    if (!studentId || !subjectId) {
-      throw new Error('Student ID and Subject ID are required');
-    }
-    
-    const response = await apiClient.get(`/student-progress/${studentId}/subject/${subjectId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching student subject progress:', error);
-    
-    // If endpoint doesn't exist yet, return a placeholder
-    if (error.response && error.response.status === 404) {
-      return {
-        subjectId,
-        completedChapters: 0,
-        totalChapters: 0,
-        completionPercentage: 0,
-        averageScore: 0,
-        timeSpentMinutes: 0,
-        lastAccessedAt: null,
-        chapterProgress: []
-      };
-    }
-    
-    throw new Error('Failed to load subject progress. Please try again later.');
-  }
-};
-
-// Get upcoming assessments for a student
-export const getUpcomingAssessments = async (studentId: string) => {
-  try {
-    if (!studentId) {
-      throw new Error('Student ID is required');
-    }
-    
-    // First check pending assessments
-    const pendingData = await getPendingAssessments(studentId);
-    
-    // Filter out aptitude tests since those are handled separately
-    const upcomingAssessments = pendingData.pendingTests
-      .filter((test: any) => test.type !== 'aptitude')
-      .map((test: any) => ({
-        id: test.id,
-        type: test.type,
-        name: test.name,
-        dueDate: test.dueDate,
-        subjectId: test.subjectId,
-        subjectName: test.subjectName
-      }));
-    
-    return upcomingAssessments;
-  } catch (error) {
-    console.error('Error fetching upcoming assessments:', error);
-    return []; // Return empty array instead of throwing
-  }
-};
-
-// Get recent assessment results for a student
-export const getRecentAssessmentResults = async (studentId: string, limit = 5) => {
-  try {
-    if (!studentId) {
-      throw new Error('Student ID is required');
-    }
-    
-    // Get assessment results
-    const results = await getStudentAssessmentResults(studentId);
-    
-    // Sort by date (newest first) and limit
-    const sortedResults = results
-      .sort((a: any, b: any) => {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return dateB - dateA;
-      })
-      .slice(0, limit);
-    
-    return sortedResults;
-  } catch (error) {
-    console.error('Error fetching recent assessment results:', error);
-    return []; // Return empty array instead of throwing
-  }  
 };

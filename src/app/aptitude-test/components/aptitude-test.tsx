@@ -1,7 +1,7 @@
 // app/aptitude-test/components/aptitude-test.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -9,25 +9,37 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Clock, ArrowLeft, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { CheckCircle2, Clock, ArrowLeft, ArrowRight, AlertCircle, Loader2, HelpCircle, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { createAssessmentResultPayload, submitAssessmentResult } from '../api/assessment-api';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { submitAssessmentResult } from '../api/assessment-api';
 
 interface AptitudeTestComponentProps {
   assessment: any;
-  onComplete: (responses: Record<string, string>, results: any) => void;
+  onComplete: (responses: Record<string, any>, results: any) => void;
 }
+
+// Define the types of questions
+type QuestionType = 'mcq' | 'true-false' | 'short-answer' | 'essay';
 
 export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestComponentProps) {
   const { toast } = useToast();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userResponses, setUserResponses] = useState<Record<string, string>>({});
+  const [userResponses, setUserResponses] = useState<Record<string, any>>({});
+  const [textInputValues, setTextInputValues] = useState<Record<string, string>>({});
   const [timeRemaining, setTimeRemaining] = useState(assessment.settings.timeLimit * 60); // Convert to seconds
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [showTimeWarningDialog, setShowTimeWarningDialog] = useState(false);
   const [isTimerActive, setIsTimerActive] = useState(true);
+  const [showHint, setShowHint] = useState<Record<string, boolean>>({});
+  
+  // Create refs for textarea and short-answer inputs
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const questions = assessment.questions || [];
   const totalQuestions = questions.length;
@@ -36,25 +48,37 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
 
   // Save responses to localStorage in case of browser refresh
   useEffect(() => {
-    const savedResponses = localStorage.getItem(`aptitude-test-${assessment._id}`);
+    // Load saved responses and text input values from localStorage
+    const savedResponses = localStorage.getItem(`aptitude-test-${assessment._id}-responses`);
+    const savedTextInputs = localStorage.getItem(`aptitude-test-${assessment._id}-text-inputs`);
+    
     if (savedResponses) {
       setUserResponses(JSON.parse(savedResponses));
+    }
+    
+    if (savedTextInputs) {
+      setTextInputValues(JSON.parse(savedTextInputs));
     }
   }, [assessment._id]);
 
   // Save responses whenever they change
   useEffect(() => {
-    localStorage.setItem(`aptitude-test-${assessment._id}`, JSON.stringify(userResponses));
+    localStorage.setItem(`aptitude-test-${assessment._id}-responses`, JSON.stringify(userResponses));
   }, [userResponses, assessment._id]);
 
-  // Modify your assessment data fetching logic
-
-
+  // Save text input values whenever they change
   useEffect(() => {
-    console.log("Full assessment object:", assessment);
-    console.log("Questions array:", assessment.questions);
-    if (assessment.questions && assessment.questions.length > 0) {
-      console.log("First question structure:", assessment.questions[0]);
+    localStorage.setItem(`aptitude-test-${assessment._id}-text-inputs`, JSON.stringify(textInputValues));
+  }, [textInputValues, assessment._id]);
+
+  // Debug logging
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Full assessment object:", assessment);
+      console.log("Questions array:", assessment.questions);
+      if (assessment.questions && assessment.questions.length > 0) {
+        console.log("First question structure:", assessment.questions[0]);
+      }
     }
   }, [assessment]);
 
@@ -97,16 +121,71 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
     return ((index + 1) / totalQuestions) * 100;
   };
 
-  // Handle user response
-  const handleResponse = (questionId: string, response: string) => {
+  // Toggle hint visibility
+  const toggleHint = (questionId: string) => {
+    setShowHint(prev => ({
+      ...prev,
+      [questionId]: !prev[questionId]
+    }));
+  };
+
+  // Handle MCQ or true-false response
+  const handleMultipleChoiceResponse = (questionId: string, response: string) => {
     setUserResponses({
       ...userResponses,
       [questionId]: response
     });
   };
 
+  // Handle text-based responses (short-answer and essay)
+  const handleTextResponse = (questionId: string, value: string) => {
+    // Store the current text input value
+    setTextInputValues({
+      ...textInputValues,
+      [questionId]: value
+    });
+    
+    // Only consider it as a response if there's actual text
+    if (value.trim()) {
+      setUserResponses({
+        ...userResponses,
+        [questionId]: value
+      });
+    } else {
+      // Remove from responses if empty
+      const updatedResponses = { ...userResponses };
+      delete updatedResponses[questionId];
+      setUserResponses(updatedResponses);
+    }
+  };
+
+  // Handle true-false response
+  const handleBooleanResponse = (questionId: string, value: boolean) => {
+    setUserResponses({
+      ...userResponses,
+      [questionId]: value
+    });
+  };
+
+  // Save the current text input when navigating away
+  const saveCurrentTextInput = () => {
+    const currentQuestion = questions[currentQuestionIndex];
+    if (!currentQuestion) return;
+    
+    if (currentQuestion.type === 'short-answer' || currentQuestion.type === 'essay') {
+      const value = textInputValues[currentQuestion._id] || '';
+      if (value.trim()) {
+        setUserResponses({
+          ...userResponses,
+          [currentQuestion._id]: value
+        });
+      }
+    }
+  };
+
   // Navigate to next question
   const goToNextQuestion = () => {
+    saveCurrentTextInput();
     if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
@@ -114,6 +193,7 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
 
   // Navigate to previous question
   const goToPreviousQuestion = () => {
+    saveCurrentTextInput();
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
@@ -122,6 +202,9 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
   // Handle submitting the test
   const handleSubmit = async () => {
     try {
+      // Save any current text input
+      saveCurrentTextInput();
+      
       setIsTimerActive(false);
       setIsSubmitting(true);
       setShowSubmitDialog(false);
@@ -136,19 +219,56 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
       const studentId = user._id;
       
       // Prepare submission data - map responses to question responses format
-      const questionResponses = Object.entries(userResponses).map(([questionId, selectedAnswer]) => {
-        // Find the question and selected option
+      const questionResponses = Object.entries(userResponses).map(([questionId, response]) => {
+        // Find the question
         const question = questions.find((q: any) => q._id === questionId);
         if (!question) return null;
         
-        const selectedOption = question.options.find((opt: any) => opt.text === selectedAnswer);
-        if (!selectedOption) return null;
+        // Handle different question types
+        let isCorrect = false;
+        let score = 0;
+        let selectedAnswer = '';
+        
+        switch (question.type) {
+          case 'mcq':
+            // For MCQ, the response is the text of the selected option
+            selectedAnswer = response as string;
+            const selectedOption = question.options.find((opt: any) => opt.text === response);
+            isCorrect = selectedOption?.isCorrect || false;
+            score = isCorrect ? question.points : 0;
+            break;
+            
+          case 'true-false':
+            // For true-false, the response is a boolean
+            selectedAnswer = response.toString();
+            const correctOption = question.options.find((opt: any) => opt.isCorrect);
+            const correctAnswer = correctOption?.text.toLowerCase() === 'true';
+            isCorrect = response === correctAnswer;
+            score = isCorrect ? question.points : 0;
+            break;
+            
+          case 'short-answer':
+            // For short-answer, we need to check if the answer is close to any correct option
+            selectedAnswer = response as string;
+            // Simple exact match for now - could be enhanced with fuzzy matching
+            isCorrect = question.options.some((opt: any) => 
+              opt.isCorrect && opt.text.toLowerCase() === (response as string).toLowerCase());
+            score = isCorrect ? question.points : 0;
+            break;
+            
+          case 'essay':
+            // Essays need to be manually graded, so we just store the response
+            selectedAnswer = response as string;
+            isCorrect = false; // Will be graded manually later
+            score = 0; // Will be scored manually later
+            break;
+        }
         
         return {
           questionId,
           selectedAnswer,
-          isCorrect: selectedOption.isCorrect,
-          score: selectedOption.isCorrect ? question.points : 0,
+          isCorrect,
+          score,
           timeSpentSeconds: Math.floor((assessment.settings.timeLimit * 60 - timeRemaining) / totalQuestions) // Estimate time spent per question
         };
       }).filter(Boolean);
@@ -157,10 +277,7 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
       const totalScore = questionResponses.reduce((sum, response) => sum + (response?.score || 0), 0);
       const timeSpentMinutes = Math.floor((assessment.settings.timeLimit * 60 - timeRemaining) / 60);
       
-      // Build assessment result payload - MATCHING EXACT POSTMAN STRUCTURE
-
-      console.log("Assessment result payload Test:", assessment);
-
+      // Build assessment result payload
       const resultPayload = {
         assessmentId: assessment._id,
         classId: assessment.classId._id,
@@ -176,7 +293,9 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
         }
       };
       
-      console.log('Submitting assessment with payload:', JSON.stringify(resultPayload, null, 2));
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Submitting assessment with payload:', JSON.stringify(resultPayload, null, 2));
+      }
       
       // Submit assessment result to API
       const result = await submitAssessmentResult(studentId, resultPayload);
@@ -186,7 +305,8 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
       const isPassed = percentageScore >= assessment.passingScore;
       
       // Clear saved responses from localStorage
-      localStorage.removeItem(`aptitude-test-${assessment._id}`);
+      localStorage.removeItem(`aptitude-test-${assessment._id}-responses`);
+      localStorage.removeItem(`aptitude-test-${assessment._id}-text-inputs`);
       
       // Show success toast
       toast({
@@ -221,6 +341,7 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
 
   // Navigate to a specific question
   const goToQuestion = (index: number) => {
+    saveCurrentTextInput();
     setCurrentQuestionIndex(index);
   };
 
@@ -235,6 +356,214 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
     return questions.every((q: any) => userResponses[q._id] !== undefined);
   };
 
+  // Render question based on its type
+  const renderQuestionByType = (question: any) => {
+    // Safely handle the difficultyLevel - it might be undefined in some questions
+    const difficultyLevel = question.difficultyLevel || "beginner"; // Default to beginner if undefined
+    const formattedDifficulty = difficultyLevel.charAt(0).toUpperCase() + difficultyLevel.slice(1);
+    
+    // Check if there are hints available
+    const hasHints = question.metadata?.hints && question.metadata.hints.length > 0;
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-start mb-4">
+          <div className="space-y-2">
+            <Badge className="mb-2">{formattedDifficulty}</Badge>
+            <h3 className="text-lg font-semibold">{question.text}</h3>
+          </div>
+          
+          {hasHints && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => toggleHint(question._id)}
+                    className="ml-2"
+                  >
+                    <HelpCircle className="h-4 w-4 mr-1" />
+                    Hint
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Click for a hint</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+        
+        {/* Display hint if available and shown */}
+        {hasHints && showHint[question._id] && (
+          <div className="bg-amber-50 border border-amber-200 p-3 rounded-md mb-4">
+            <div className="flex items-start">
+              <Info className="h-5 w-5 text-amber-600 mr-2 mt-0.5" />
+              <div>
+                <p className="font-medium text-amber-800 mb-1">Hint:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  {question.metadata.hints.map((hint: string, i: number) => (
+                    <li key={i} className="text-sm text-amber-700">{hint}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Show question explanation if available */}
+        {question.explanation && (
+          <div className="bg-blue-50 border border-blue-200 p-3 rounded-md mb-4">
+            <div className="flex items-start">
+              <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5" />
+              <div>
+                <p className="font-medium text-blue-800 mb-1">Note:</p>
+                <p className="text-sm text-blue-700">{question.explanation}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Render input based on question type */}
+        {renderQuestionInput(question)}
+      </div>
+    );
+  };
+  
+  // Render the appropriate input for each question type
+  const renderQuestionInput = (question: any) => {
+    switch (question.type) {
+      case 'mcq':
+        return renderMultipleChoiceInput(question);
+      case 'true-false':
+        return renderTrueFalseInput(question);
+      case 'short-answer':
+        return renderShortAnswerInput(question);
+      case 'essay':
+        return renderEssayInput(question);
+      default:
+        return (
+          <div className="p-4 border rounded-md bg-red-50 text-red-700">
+            <p>Unsupported question type: {question.type}</p>
+          </div>
+        );
+    }
+  };
+  
+  // Render multiple choice question input
+  const renderMultipleChoiceInput = (question: any) => {
+    const selectedAnswer = userResponses[question._id];
+    const options = Array.isArray(question.options) ? question.options : [];
+
+    if (options.length === 0) {
+      return (
+        <div className="p-4 border rounded-md bg-amber-50 text-amber-800">
+          <p>No options available for this question. Please contact support.</p>
+        </div>
+      );
+    }
+
+    return (
+      <RadioGroup 
+        value={selectedAnswer} 
+        onValueChange={(value) => handleMultipleChoiceResponse(question._id, value)}
+        className="space-y-3"
+      >
+        {options.map((option: any, index: number) => (
+          <div 
+            key={index} 
+            className={cn(
+              "flex items-center space-x-2 rounded-md border p-4 transition-colors",
+              selectedAnswer === option.text && "border-primary bg-primary/5"
+            )}
+          >
+            <RadioGroupItem 
+              value={option.text} 
+              id={`option-${question._id}-${index}`} 
+              className="aria-checked:border-primary"
+            />
+            <Label htmlFor={`option-${question._id}-${index}`} className="flex-grow cursor-pointer">
+              {option.text}
+            </Label>
+          </div>
+        ))}
+      </RadioGroup>
+    );
+  };
+  
+  // Render true-false question input
+  const renderTrueFalseInput = (question: any) => {
+    const selectedAnswer = userResponses[question._id];
+    
+    return (
+      <div className="space-y-4">
+        <div 
+          className={cn(
+            "flex items-center space-x-2 rounded-md border p-4 transition-colors",
+            selectedAnswer === true && "border-primary bg-primary/5"
+          )}
+        >
+          <Switch
+            id={`true-option-${question._id}`}
+            checked={selectedAnswer === true}
+            onCheckedChange={() => handleBooleanResponse(question._id, true)}
+          />
+          <Label htmlFor={`true-option-${question._id}`} className="flex-grow cursor-pointer">True</Label>
+        </div>
+        
+        <div 
+          className={cn(
+            "flex items-center space-x-2 rounded-md border p-4 transition-colors",
+            selectedAnswer === false && "border-primary bg-primary/5"
+          )}
+        >
+          <Switch
+            id={`false-option-${question._id}`}
+            checked={selectedAnswer === false}
+            onCheckedChange={() => handleBooleanResponse(question._id, false)}
+          />
+          <Label htmlFor={`false-option-${question._id}`} className="flex-grow cursor-pointer">False</Label>
+        </div>
+      </div>
+    );
+  };
+  
+  // Render short answer question input
+  const renderShortAnswerInput = (question: any) => {
+    return (
+      <div className="space-y-2">
+        <Input
+          placeholder="Type your answer here..."
+          value={textInputValues[question._id] || ''}
+          onChange={(e) => handleTextResponse(question._id, e.target.value)}
+          className="w-full"
+        />
+        <p className="text-sm text-muted-foreground">
+          Type a short, concise answer. Be precise with your wording.
+        </p>
+      </div>
+    );
+  };
+  
+  // Render essay question input
+  const renderEssayInput = (question: any) => {
+    return (
+      <div className="space-y-2">
+        <Textarea
+          ref={textareaRef}
+          placeholder="Write your answer here..."
+          value={textInputValues[question._id] || ''}
+          onChange={(e) => handleTextResponse(question._id, e.target.value)}
+          className="min-h-[200px] w-full"
+        />
+        <p className="text-sm text-muted-foreground">
+          Write a detailed answer. You can use paragraphs to organize your thoughts.
+        </p>
+      </div>
+    );
+  };
+
   // Render the current question
   const renderQuestion = () => {
     if (!questions.length || currentQuestionIndex >= questions.length) {
@@ -247,86 +576,7 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
     }
 
     const question = questions[currentQuestionIndex];
-    const selectedAnswer = userResponses[question._id];
-    
-    // Safely handle the difficultyLevel - it might be undefined in some questions
-    const difficultyLevel = question.difficultyLevel || "beginner"; // Default to beginner if undefined
-    const formattedDifficulty = difficultyLevel.charAt(0).toUpperCase() + difficultyLevel.slice(1);
-    
-    // Ensure options exists and is an array
-    const options = Array.isArray(question.options) ? question.options : [];
-
-    return (
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <Badge className="mb-2">
-            {formattedDifficulty}
-          </Badge>
-          <h3 className="text-lg font-semibold">{question.text}</h3>
-        </div>
-
-        {options.length > 0 ? (
-          <RadioGroup 
-            value={selectedAnswer} 
-            onValueChange={(value) => handleResponse(question._id, value)}
-            className="space-y-3"
-          >
-            {options.map((option: any, index: number) => (
-              <div 
-                key={index} 
-                className={cn(
-                  "flex items-center space-x-2 rounded-md border p-4 transition-colors",
-                  selectedAnswer === option.text && "border-primary bg-primary/5"
-                )}
-              >
-                <RadioGroupItem 
-                  value={option.text} 
-                  id={`option-${index}`} 
-                  className="aria-checked:border-primary"
-                />
-                <Label htmlFor={`option-${index}`} className="flex-grow cursor-pointer">
-                  {option.text}
-                </Label>
-              </div>
-            ))}
-          </RadioGroup>
-        ) : (
-          <div className="p-4 border rounded-md bg-amber-50 text-amber-800">
-            <p>No options available for this question. Please contact support.</p>
-          </div>
-        )}
-
-        <div className="flex justify-between pt-4">
-          <Button 
-            variant="outline" 
-            onClick={goToPreviousQuestion}
-            disabled={currentQuestionIndex === 0}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Previous
-          </Button>
-          
-          {currentQuestionIndex < totalQuestions - 1 ? (
-            <Button 
-              onClick={goToNextQuestion}
-              disabled={!isCurrentQuestionAnswered()}
-            >
-              Next
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          ) : (
-            <Button 
-              onClick={() => setShowSubmitDialog(true)}
-              disabled={!areAllQuestionsAnswered() || isSubmitting}
-              variant="default"
-            >
-              Submit Test
-              <CheckCircle2 className="ml-2 h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </div>
-    );
+    return renderQuestionByType(question);
   };
 
   return (
@@ -366,20 +616,34 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-4 gap-2">
-                {questions.map((q: any, index: number) => (
-                  <Button
-                    key={index}
-                    variant={userResponses[q._id] ? "default" : "outline"}
-                    size="sm"
-                    className={cn(
-                      "h-10 w-10 p-0",
-                      currentQuestionIndex === index && "ring-2 ring-primary ring-offset-2"
-                    )}
-                    onClick={() => goToQuestion(index)}
-                  >
-                    {index + 1}
-                  </Button>
-                ))}
+                {questions.map((q: any, index: number) => {
+                  // Determine the variant based on question type and answered status
+                  let variant = userResponses[q._id] ? "default" : "outline";
+                  
+                  // Add visual indicators for different question types
+                  const questionTypeClasses = {
+                    'mcq': '',
+                    'true-false': 'border-blue-400',
+                    'short-answer': 'border-green-400',
+                    'essay': 'border-purple-400'
+                  };
+                  
+                  return (
+                    <Button
+                      key={index}
+                      variant={variant}
+                      size="sm"
+                      className={cn(
+                        "h-10 w-10 p-0",
+                        !userResponses[q._id] && questionTypeClasses[q.type as QuestionType],
+                        currentQuestionIndex === index && "ring-2 ring-primary ring-offset-2"
+                      )}
+                      onClick={() => goToQuestion(index)}
+                    >
+                      {index + 1}
+                    </Button>
+                  );
+                })}
               </div>
               
               <div className="mt-4 pt-4 border-t">
@@ -388,6 +652,29 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
                   <span>{answeredQuestions}/{totalQuestions}</span>
                 </div>
                 <Progress value={progressPercentage} className="h-2" />
+              </div>
+              
+              {/* Question type legend */}
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm text-muted-foreground mb-2">Question Types:</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-primary rounded-full mr-2"></div>
+                    <span>Multiple Choice</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                    <span>True/False</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                    <span>Short Answer</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
+                    <span>Essay</span>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -401,14 +688,58 @@ export function AptitudeTestComponent({ assessment, onComplete }: AptitudeTestCo
                 <CardTitle className="text-base">
                   Question {currentQuestionIndex + 1} of {totalQuestions}
                 </CardTitle>
-                <Badge variant="outline">
-                  {questions[currentQuestionIndex]?.points || 0} points
-                </Badge>
+                <div className="flex space-x-2 items-center">
+                  <Badge variant="outline">
+                    {questions[currentQuestionIndex]?.points || 0} points
+                  </Badge>
+                  <Badge 
+                    variant="outline" 
+                    className={cn({
+                      'bg-primary/10 text-primary': questions[currentQuestionIndex]?.type === 'mcq',
+                      'bg-blue-100 text-blue-800': questions[currentQuestionIndex]?.type === 'true-false',
+                      'bg-green-100 text-green-800': questions[currentQuestionIndex]?.type === 'short-answer',
+                      'bg-purple-100 text-purple-800': questions[currentQuestionIndex]?.type === 'essay',
+                    })}
+                  >
+                    {questions[currentQuestionIndex]?.type === 'mcq' ? 'Multiple Choice' :
+                     questions[currentQuestionIndex]?.type === 'true-false' ? 'True/False' :
+                     questions[currentQuestionIndex]?.type === 'short-answer' ? 'Short Answer' :
+                     questions[currentQuestionIndex]?.type === 'essay' ? 'Essay' : 'Unknown'}
+                  </Badge>
+                </div>
               </div>
               <Progress value={getQuestionProgress(currentQuestionIndex)} className="h-1" />
             </CardHeader>
             <CardContent>
               {renderQuestion()}
+              
+              {/* Navigation buttons */}
+              <div className="flex justify-between pt-6 mt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={goToPreviousQuestion}
+                  disabled={currentQuestionIndex === 0}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Previous
+                </Button>
+                
+                {currentQuestionIndex < totalQuestions - 1 ? (
+                  <Button onClick={goToNextQuestion}>
+                    Next
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={() => setShowSubmitDialog(true)}
+                    disabled={isSubmitting}
+                    variant="default"
+                  >
+                    Submit Test
+                    <CheckCircle2 className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>

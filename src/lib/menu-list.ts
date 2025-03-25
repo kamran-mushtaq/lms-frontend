@@ -79,7 +79,7 @@ export function getMenuList(pathname: string): Group[] {
       menus: [
         {
           href: "/chapters",
-          label: "Chapters",
+          label: "chapters",
           icon: ClipboardList,
           submenus: []
         }
@@ -100,7 +100,7 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "",
       menus: [
         {
-          href: "/assessments-manage",
+          href: "/assessments-management",
           label: "Assessments",
           icon: ClipboardList,
           submenus: []
@@ -155,8 +155,63 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "",
       menus: [
         {
-          href: "/settings",
-          label: "Settings",
+          href: "/content-versions",
+          label: "Content Versions",
+          icon: ClipboardList,
+          submenus: []
+        }
+      ]
+    },
+    {
+      groupLabel: "",
+      menus: [
+        {
+          href: "/notifications",
+          label: "Notifications",
+          icon: ClipboardList,
+          submenus: []
+        }
+      ]
+    },
+    {
+      groupLabel: "",
+      menus: [
+        {
+          href: "/feature-flags",
+          label: "Feature Flags",
+          icon: ClipboardList,
+          submenus: []
+        }
+      ]
+    },
+    {
+      groupLabel: "",
+      menus: [
+        {
+          href: "/assessment-templates",
+          label: "Assessment Templates",
+          icon: ClipboardList,
+          submenus: []
+        }
+      ]
+    },
+    {
+      groupLabel: "",
+      menus: [
+        {
+          href: "/attributes",
+          label: "Attributes",
+          icon: ClipboardList,
+          submenus: []
+        }
+      ]
+    },
+    {
+      groupLabel: "",
+      menus: [
+        {
+          href: "/attribute-types",
+          label: "Attribute Types",
           icon: ClipboardList,
           submenus: []
         }

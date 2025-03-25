@@ -44,7 +44,7 @@ import useSWR from "swr";
 import apiClient from "@/lib/api-client";
 
 // Define the question types
-type QuestionType = "mcq" | "truefalse" | "essay";
+type QuestionType = "mcq" | "true-false" | "essay";
 type DifficultyLevel = "beginner" | "intermediate" | "advanced";
 
 // Question interface
@@ -92,7 +92,7 @@ const optionSchema = z.object({
 // Zod validation schema for the form
 const questionSchema = z.object({
   text: z.string().min(2, { message: "Question text is required" }),
-  type: z.enum(["mcq", "truefalse", "essay"], {
+  type: z.enum(["mcq", "true-false", "essay"], {
     required_error: "Please select a question type"
   }),
   options: z
@@ -178,7 +178,7 @@ export function QuestionForm({
       // For True/False questions, ensure we have exactly two options (True and False)
       let formattedData = { ...data };
 
-      if (data.type === "truefalse") {
+      if (data.type === "true-false") {
         // Find if we have a "true" option selected
         const hasTrueOption = data.options.some(
           (opt) => opt.isCorrect === true
@@ -230,7 +230,7 @@ export function QuestionForm({
   // True/False questions require special handling
   useEffect(() => {
     // If the question type changes to True/False, reset options
-    if (watchQuestionType === "truefalse") {
+    if (watchQuestionType === "true-false") {
       form.setValue("options", [
         { text: "True", isCorrect: true },
         { text: "False", isCorrect: false }
@@ -426,7 +426,7 @@ export function QuestionForm({
                                       placeholder="Option text"
                                       {...field}
                                       disabled={
-                                        watchQuestionType === "truefalse"
+                                        watchQuestionType === "true-false"
                                       }
                                     />
                                   </FormControl>
@@ -445,7 +445,7 @@ export function QuestionForm({
                                       checked={field.value}
                                       onCheckedChange={(checked) => {
                                         // For true/false, make sure only one option can be correct
-                                        if (watchQuestionType === "truefalse") {
+                                        if (watchQuestionType === "true-false") {
                                           form.setValue(
                                             `options.${0}.isCorrect`,
                                             index === 0
