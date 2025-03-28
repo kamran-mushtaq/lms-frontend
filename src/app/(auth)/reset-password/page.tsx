@@ -1,16 +1,16 @@
 import { GalleryVerticalEnd } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-
 import { ResetPasswordForm } from "@/components/reset-password-form";
-import { BgImg } from "../../../../public/images";
+import bgImage from '../../../../public/images/bg.jpg';
 
+// Define our own searchParams type instead of using PageProps
 export default function ResetPasswordPage({
-  searchParams
+  searchParams,
 }: {
-  searchParams: { token?: string };
+  searchParams: { [key: string]: string | string[] | undefined } & { token?: string | string[] }
 }) {
-  const token = searchParams.token || "";
+  const token = typeof searchParams.token === 'string' ? searchParams.token : ""; 
 
   if (!token) {
     return (
@@ -66,9 +66,10 @@ export default function ResetPasswordPage({
         </div>
       </div>
       <Image
-        src={BgImg}
+        src={bgImage}
         alt="Background"
         className="hidden lg:block object-cover w-full h-full"
+        priority
       />
     </div>
   );

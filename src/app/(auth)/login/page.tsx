@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 import { LoginForm } from "@/components/login-form";
-import { BgImg } from "../../../../public/images";
+import bgImage from '../../../../public/images/bg.jpg';
 
 export default function LoginPage() {
   return (
@@ -24,7 +24,7 @@ export default function LoginPage() {
         </div>
       </div>
       <Image
-        src={BgImg}
+        src={bgImage}
         alt="Background"
         className="hidden lg:block object-cover w-full h-full"
       />

@@ -1,16 +1,17 @@
 import { GalleryVerticalEnd } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-
 import { OtpVerificationForm } from "@/components/otp-verification-form";
-import { BgImg } from "../../../../public/images";
+import bgImage from '../../../../public/images/bg.jpg';
 
-export default function VerifyOtpPage({
-  searchParams
-}: {
-  searchParams: { userId?: string };
-}) {
-  const userId = searchParams.userId;
+// Simplify the props type by using a more straightforward interface
+interface VerifyOtpPageProps {
+  searchParams: Record<string, string | string[] | undefined>;
+}
+
+export default function VerifyOtpPage(props: any) {
+  const searchParams = props.searchParams || {};
+  const userId = typeof searchParams.userId === 'string' ? searchParams.userId : "";
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
@@ -30,7 +31,7 @@ export default function VerifyOtpPage({
         </div>
       </div>
       <Image
-        src={BgImg}
+        src={bgImage}
         alt="Background"
         className="hidden lg:block object-cover w-full h-full"
       />

@@ -1,7 +1,7 @@
 import { GalleryVerticalEnd } from "lucide-react";
 import Image from "next/image";
 
-import { BgImg } from "../../../public/images";
+import bgImage from '../../../../public/images/bg.jpg';
 import { ConfirmPasswordForm } from "@/components/confirm-password-form";
 
 export default function ConfimPasswordPage() {
@@ -22,7 +22,7 @@ export default function ConfimPasswordPage() {
           </div>
         </div>
       </div>
-      <Image src={BgImg} alt="Image" className="object-cover w-full h-full" />
+      <Image src={bgImage} alt="Image" className="object-cover w-full h-full" />
     </div>
   );
 }

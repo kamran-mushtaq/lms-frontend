@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChapterAssignmentTable } from "./components/chapter-assignment-table";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 // Fix the import path - use a separate hook file for single subject
 import { useSubject } from "../../hooks/use-subject";
-// DO NOT import from use-subjects.ts - that file has useSubjects (plural)
-
 import { useChapters } from "./hooks/use-chapters";
 import {
   Card,
@@ -24,11 +22,10 @@ import {
 } from "@/components/ui/card";
 import { ChapterForm } from "./components/chapter-form";
 
-export default function SubjectChaptersPage({
-  params
-}: {
-  params: { id: string };
-}) {
+export default function SubjectChaptersPage() {
+  const params = useParams();
+  const subjectId = params.id as string;
+  
   const [showChapterForm, setShowChapterForm] = useState(false);
   const [selectedChapter, setSelectedChapter] = useState<any | null>(null);
   const router = useRouter();
@@ -37,13 +34,13 @@ export default function SubjectChaptersPage({
     subject,
     isLoading: subjectLoading,
     error: subjectError
-  } = useSubject(params.id);
+  } = useSubject(subjectId);
   const {
     chapters,
     isLoading: chaptersLoading,
     error: chaptersError,
     mutate: mutateChapters
-  } = useChapters(params.id);
+  } = useChapters(subjectId);
 
   const handleAddChapter = () => {
     setSelectedChapter(null);
@@ -143,7 +140,7 @@ export default function SubjectChaptersPage({
         <ChapterForm
           open={showChapterForm}
           setOpen={setShowChapterForm}
-          subjectId={params.id}
+          subjectId={subjectId}
           chapter={selectedChapter}
           onSuccess={handleSuccess}
           onError={handleError}
