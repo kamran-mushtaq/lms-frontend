@@ -6,8 +6,9 @@ import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import axios from "axios";
 import { setCookie, getCookie, deleteCookie } from "@/lib/cookies";
+import apiClient from "@/lib/api-client";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://phpstack-732216-5200333.cloudwaysapps.com/api";
 
 type AptitudeTestStatus = {
   attempted: boolean;
@@ -76,75 +77,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Check if user is logged in on initial load
   useEffect(() => {
-    const checkAuth = async () => {
-      setIsLoading(true);
-      try {
-        // Try to get token from both localStorage and cookies
-        const token = localStorage.getItem("token") || getCookie("token");
-        if (!token) {
-          throw new Error("No token found");
-        }
+   const checkAuth = async () => {
+     setIsLoading(true);
+     try {
+       const token = localStorage.getItem("token") || getCookie("token");
+       if (!token) {
+         console.warn("No token found. Redirecting to login...");
+         setUser(null);
+         return;
+       }
 
-        // Set default auth header for all requests
-        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+       let userInfo;
+       try {
+         userInfo = JSON.parse(localStorage.getItem("user") || "null");
+       } catch (e) {
+         const userCookie = getCookie("user");
+         if (userCookie) {
+           userInfo = JSON.parse(userCookie);
+         }
+       }
 
-        // Try to get user info from both localStorage and cookies
-        let userInfo;
-        try {
-          userInfo = JSON.parse(localStorage.getItem("user") || "null");
-        } catch (e) {
-          // Try cookie as fallback
-          const userCookie = getCookie("user");
-          if (userCookie) {
-            userInfo = JSON.parse(userCookie);
-          }
-        }
-
-        if (userInfo) {
-          // If student, check aptitude test status
-          if (userInfo.type === "student") {
-            try {
-              const aptitudeStatus = await checkAptitudeTestStatus(
-                userInfo._id
-              );
-              userInfo.aptitudeTestStatus = aptitudeStatus || {
-                attempted: false,
-                passed: false
-              };
-            } catch (error) {
-              console.error(
-                "Error checking aptitude test status during init:",
-                error
-              );
-              // Initialize with default values if check fails
-              userInfo.aptitudeTestStatus = userInfo.aptitudeTestStatus || {
-                attempted: false,
-                passed: false
-              };
-            }
-          }
-
-          setUser(userInfo);
-
-          // Ensure data is synced between localStorage and cookies
-          localStorage.setItem("token", token);
-          localStorage.setItem("user", JSON.stringify(userInfo));
-          setCookie("token", token, 7);
-          setCookie("user", JSON.stringify(userInfo), 7);
-        }
-      } catch (error) {
-        console.error("Authentication error:", error);
-        setUser(null);
-        // Clear all auth data
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        deleteCookie("token");
-        deleteCookie("user");
-        delete axios.defaults.headers.common["Authorization"];
-      } finally {
-        setIsLoading(false);
-      }
-    };
+       if (userInfo) {
+         if (userInfo.type === "student") {
+           try {
+             const aptitudeStatus = await checkAptitudeTestStatus(userInfo._id);
+             userInfo.aptitudeTestStatus = aptitudeStatus || {
+               attempted: false,
+               passed: false,
+             };
+           } catch (error) {
+             console.error(
+               "Error checking aptitude test status during init:",
+               error
+             );
+             userInfo.aptitudeTestStatus = userInfo.aptitudeTestStatus || {
+               attempted: false,
+               passed: false,
+             };
+           }
+         }
+         setUser(userInfo);
+         localStorage.setItem("token", token);
+         localStorage.setItem("user", JSON.stringify(userInfo));
+         setCookie("token", token, 7);
+         setCookie("user", JSON.stringify(userInfo), 7);
+       }
+     } catch (error) {
+       console.error("Authentication error:", error);
+       setUser(null);
+       localStorage.removeItem("token");
+       localStorage.removeItem("user");
+       deleteCookie("token");
+       deleteCookie("user");
+       delete axios.defaults.headers.common["Authorization"];
+     } finally {
+       setIsLoading(false);
+     }
+   };
 
     checkAuth();
   }, []);
@@ -237,9 +227,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, {
+      const response = await apiClient.post(`${API_URL}/auth/login`, {
         email,
-        password
+        password,
       });
       const { access_token, user: userData,profile } = response.data;
 
