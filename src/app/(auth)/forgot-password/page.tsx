@@ -1,33 +1,30 @@
-import { GalleryVerticalEnd } from "lucide-react";
-import Link from "next/link";
-import Image from "next/image";
 
+'use client';
+
+import React, { useState } from 'react';
+import { LoginForm } from "@/components/login-form";
+import AuthSide from "@/components/auth-side";
+import { Image } from 'lucide-react';
 import { ForgotPasswordForm } from "@/components/forgot-password-form";
-import bgImage from '../../../../public/images/bg.jpg';
 
-export default function ForgotPasswordPage() {
+function LoginPage() {
   return (
-    <div className="grid min-h-svh lg:grid-cols-2">
-      <div className="flex flex-col gap-4 p-6 md:p-10">
-        <div className="flex justify-center gap-2 md:justify-start">
-          <Link href="/" className="flex items-center gap-2 font-medium">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <GalleryVerticalEnd className="size-4" />
+    <div className="flex min-h-screen">
+      {/* Left side - Login Form */}
+      <div className="w-full lg:w-1/2 p-8 flex flex-col justify-center items-center">
+        <div className="w-full max-w-md">
+          <div className="mb-8">
+            <img src="/images/logo.png" alt="Logo" className="w-40  mx-auto" />
             </div>
-            K12 LMS
-          </Link>
-        </div>
-        <div className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-xs">
-            <ForgotPasswordForm />
-          </div>
+          {/* Login Form */}
+          <ForgotPasswordForm />
         </div>
       </div>
-      <Image
-        src={bgImage}
-        alt="Background"
-        className="hidden lg:block object-cover w-full h-full"
-      />
+      {/* Right side - Slider */}
+      <AuthSide />
+     
     </div>
   );
 }
+
+export default LoginPage;

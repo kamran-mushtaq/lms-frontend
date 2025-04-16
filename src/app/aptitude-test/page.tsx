@@ -118,7 +118,7 @@ export default function AptitudeTestPage() {
         
         // Get pending assessments
         const pendingData = await getPendingAssessments(studentId);
-        console.log('Pending assessments data:', pendingData);
+        console.log('Pending assessments data:', pendingData); // Keep original log too
         
         if (pendingData.hasPendingTest && pendingData.pendingTests.length > 0) {
             // Filter only aptitude tests
@@ -203,7 +203,7 @@ export default function AptitudeTestPage() {
           // Check enrollments directly to see if we need tests
           console.log("No pending tests found in initial check, checking enrollments directly");
           const enrollments = await getStudentEnrollments(studentId);
-          console.log("Student enrollments:", enrollments);
+          console.log("Student enrollments:", enrollments); // Keep original log too
           
           const pendingAptitudeEnrollments = enrollments.filter((enrollment) => 
             !enrollment.aptitudeTestCompleted && (!enrollment.aptitudeTestId || enrollment.aptitudeTestId === undefined)
@@ -273,19 +273,77 @@ export default function AptitudeTestPage() {
                 setCurrentStep('no-test');
               }
             } else {
-              // No pending tests at all, redirect to dashboard
-              console.log("No pending tests found at all, redirecting to dashboard");
-              toast({
-                title: "No pending aptitude tests",
-                description: "You have no pending aptitude tests. Redirecting to dashboard.",
-                duration: 3000,
-              });
+              // --- NEW CHECK: Look for completed but failed tests ---
+              const failedTestEnrollments = enrollments.filter((enrollment) =>
+                enrollment.aptitudeTestCompleted === true && enrollment.aptitudeTestPassed === false
+              );
               
-              // Delay to show the toast
-              setTimeout(() => {
-                localStorage.setItem('redirect_count', '0'); // Reset the redirect counter
-                router.push('/dashboard');
-              }, 3000);
+              console.log("Enrollments with completed but failed tests:", failedTestEnrollments);
+
+              if (failedTestEnrollments.length > 0) {
+                // Tests are completed, but at least one was failed. Stay on this page.
+                console.log("Found completed but failed tests. Staying on aptitude page.");
+                
+                const formattedFailedTests = failedTestEnrollments.map(e => {
+                   // Ensure we extract a usable ID string
+                   let testId = e.aptitudeTestId;
+                   if (typeof testId === 'object' && testId !== null && testId._id) {
+                     testId = testId._id.toString();
+                   } else if (testId) {
+                     testId = testId.toString();
+                   } else {
+                     testId = null; // Handle cases where ID might be missing
+                   }
+                   
+                   return {
+                     type: 'aptitude',
+                     name: `Aptitude Test for ${e.subjectId?.displayName || 'Subject'} (Failed)`,
+                     id: testId,
+                     status: 'Failed', // Add a status indicator
+                     subjectId: e.subjectId?._id || e.subjectId,
+                     subjectName: e.subjectId?.displayName || 'Subject'
+                   };
+                 });
+
+                 setPendingTests(formattedFailedTests);
+                 setTestData(prev => ({ ...prev, isLoading: false, error: null })); // Ensure loading is false and error is cleared
+                 
+                 // --- IMPORTANT: Set the selectedTest to the first failed test ID ---
+                 if (formattedFailedTests.length > 0 && formattedFailedTests[0].id) {
+                   console.log("Setting selected test to the first failed test:", formattedFailedTests[0].id);
+                   setSelectedTest(formattedFailedTests[0].id);
+                 } else {
+                    console.warn("Could not determine a valid ID for the failed test to display.");
+                    // Handle case where failed test ID is missing - maybe show a generic error?
+                    setTestData(prev => ({ ...prev, isLoading: false, error: "Could not load details for the failed test." }));
+                 }
+                 
+                 // Set step to intro AFTER setting selectedTest
+                 setCurrentStep('intro');
+                 
+                 toast({
+                   variant: "destructive",
+                   title: "Aptitude Test Failed",
+                   description: "You must pass all required aptitude tests to proceed.",
+                   duration: 5000,
+                 });
+
+              } else {
+                // --- ORIGINAL LOGIC: No incomplete AND no failed tests ---
+                // No pending tests at all, redirect to dashboard
+                console.log("No incomplete or failed tests found, redirecting to dashboard");
+                toast({
+                  title: "All Aptitude Tests Passed!",
+                  description: "Redirecting to your dashboard.",
+                  duration: 3000,
+                });
+                
+                // Delay to show the toast
+                setTimeout(() => {
+                  localStorage.setItem('redirect_count', '0'); // Reset the redirect counter
+                  router.push('/student/dashboard');
+                }, 3000);
+              }
             }
           }
         }
@@ -417,7 +475,7 @@ const fetchAssessment = async () => {
   // Handle returning to dashboard after test
   const handleReturnToDashboard = () => {
     localStorage.setItem('redirect_count', '0'); // Reset the redirect counter
-    router.push('/dashboard');
+    router.push('/student/dashboard');
   };
 
   // Render appropriate step

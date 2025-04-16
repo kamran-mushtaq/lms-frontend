@@ -1,12 +1,17 @@
 import {
-  Tag,
-  Users,
-  Settings,
-  Bookmark,
-  SquarePen,
   LayoutGrid,
-  LucideIcon,
-  ClipboardList
+  Users,
+  BookOpen,
+  ClipboardList,
+  FileText,
+  GraduationCap,
+  Bell,
+  Flag,
+  Layers,
+  Tag,
+  Settings,
+  ListTodo,
+  School
 } from "lucide-react";
 
 type Submenu = {
@@ -31,10 +36,10 @@ type Group = {
 export function getMenuList(pathname: string): Group[] {
   return [
     {
-      groupLabel: "",
+      groupLabel: "Overview",
       menus: [
         {
-          href: "/dashboard",
+          href: "dashboard",
           label: "Dashboard",
           icon: LayoutGrid,
           submenus: []
@@ -42,177 +47,128 @@ export function getMenuList(pathname: string): Group[] {
       ]
     },
     {
-      groupLabel: "",
+      groupLabel: "User Management",
       menus: [
         {
-          href: "/users",
+          href: "users",
           label: "Users",
           icon: Users,
           submenus: []
+        },
+        {
+          href: "enrollments",
+          label: "Enrollments",
+          icon: GraduationCap,
+          submenus: []
+        },
+        {
+          href: "guardian-student",
+          label: "Guardian Student",
+          icon: School,
+          submenus: []
         }
       ]
     },
     {
-      groupLabel: "",
+      groupLabel: "Academic Content",
       menus: [
         {
-          href: "/classes",
+          href: "classes",
           label: "Classes",
           icon: ClipboardList,
           submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
+        },
         {
-          href: "/subjects",
+          href: "subjects",
           label: "Subjects",
-          icon: ClipboardList,
+          icon: BookOpen,
           submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
+        },
         {
-          href: "/chapters",
-          label: "chapters",
-          icon: ClipboardList,
+          href: "chapters",
+          label: "Chapters",
+          icon: BookOpen,
           submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
+        },
         {
-          href: "/lectures",
+          href: "lectures",
           label: "Lectures",
-          icon: ClipboardList,
+          icon: BookOpen,
+          submenus: []
+        },
+        {
+          href: "study-plans",
+          label: "Study Plans",
+          icon: ListTodo,
+          submenus: []
+        },
+        {
+          href: "content-versions",
+          label: "Content Versions",
+          icon: Layers,
           submenus: []
         }
       ]
     },
     {
-      groupLabel: "",
+      groupLabel: "Assessments",
       menus: [
         {
-          href: "/assessments-management",
+          href: "assessments-management",
           label: "Assessments",
           icon: ClipboardList,
           submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
+        },
         {
-          href: "/questions",
+          href: "questions",
           label: "Questions",
-          icon: ClipboardList,
+          icon: FileText,
           submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
+        },
         {
-          href: "/enrollments",
-          label: "Enrollments",
-          icon: ClipboardList,
-          submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
-        {
-          href: "/study-plans",
-          label: "Study Plans",
-          icon: ClipboardList,
-          submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
-        {
-          href: "/guardian-student",
-          label: "Guardian Student",
-          icon: ClipboardList,
-          submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
-        {
-          href: "/content-versions",
-          label: "Content Versions",
-          icon: ClipboardList,
-          submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
-        {
-          href: "/notifications",
-          label: "Notifications",
-          icon: ClipboardList,
-          submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
-        {
-          href: "/feature-flags",
-          label: "Feature Flags",
-          icon: ClipboardList,
-          submenus: []
-        }
-      ]
-    },
-    {
-      groupLabel: "",
-      menus: [
-        {
-          href: "/assessment-templates",
+          href: "assessment-templates",
           label: "Assessment Templates",
-          icon: ClipboardList,
+          icon: FileText,
           submenus: []
         }
       ]
     },
     {
-      groupLabel: "",
+      groupLabel: "Attributes & Types",
       menus: [
         {
-          href: "/attributes",
+          href: "attributes",
           label: "Attributes",
-          icon: ClipboardList,
+          icon: Tag,
+          submenus: []
+        },
+        {
+          href: "attribute-types",
+          label: "Attribute Types",
+          icon: Tag,
           submenus: []
         }
       ]
     },
     {
-      groupLabel: "",
+      groupLabel: "System Settings",
       menus: [
         {
-          href: "/attribute-types",
-          label: "Attribute Types",
-          icon: ClipboardList,
+          href: "notifications",
+          label: "Notifications",
+          icon: Bell,
+          submenus: []
+        },
+        {
+          href: "feature-flags",
+          label: "Feature Flags",
+          icon: Flag,
+          submenus: []
+        },
+        {
+          href: "settings",
+          label: "Settings",
+          icon: Settings,
           submenus: []
         }
       ]

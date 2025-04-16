@@ -4,7 +4,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import  AdminPanelLayout  from "@/components/admin-panel-parent/admin-panel-layout";
+import  AdminPanelLayout  from "@/components/admin-panel/admin-panel-other-layout";
 
 export default function StudentDashboardLayout({
   children

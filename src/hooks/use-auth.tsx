@@ -1,3 +1,5 @@
+"use client"; // Mark this module as a Client Component boundary
+
 // hooks/use-auth.tsx
 import { useState, useEffect, useCallback, useContext } from 'react';
 import { useRouter } from 'next/navigation';

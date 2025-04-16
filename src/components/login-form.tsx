@@ -42,24 +42,21 @@ export function LoginForm({
     setError(null);
     try {
       const success = await login(values.email, values.password);
-      if (!success) {
-        setError("Invalid email or password");
+      // AuthContext now handles redirection and detailed error messages (via toast)
+      // The login function returns true on success, false on failure.
+      // We only need to clear the local error state if a previous attempt failed.
+      if (success) {
+        // Login successful, redirection is handled by AuthContext
+        // No need to do anything here
       } else {
-        // Check for parent verification status
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-
-        // If parent and not verified, redirect to OTP verification
-        if (user.type === "parent" && !user.isVerified) {
-          router.push(`/verify-otp?userId=${user._id}`);
-        } else {
-          // Otherwise redirect to appropriate dashboard
-          const userType = user.type || "student";
-          const dashboardPath = `/${userType}/dashboard`;
-          window.location.href = dashboardPath;
-        }
+        // Login failed, AuthContext shows a toast.
+        // We could potentially set a local error state here if needed,
+        // but relying on the toast from AuthContext is cleaner.
+        // setError("Invalid email or password"); // Removed redundant error setting
       }
     } catch (error) {
-      setError("An unexpected error occurred. Please try again.");
+      // AuthContext handles unexpected errors via toast as well
+      // setError("An unexpected error occurred. Please try again.");
     }
   };
 

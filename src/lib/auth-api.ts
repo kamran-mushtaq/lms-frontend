@@ -13,6 +13,7 @@ interface UserData {
 
 // Error handling helper
 const handleApiError = (error: unknown): Error => {
+  console.log("handleApiError called with error:", error); // Added log
   console.error("Auth API error:", error);
 
   let errorMessage = "An unexpected error occurred";
@@ -33,6 +34,7 @@ const handleApiError = (error: unknown): Error => {
     errorMessage = error.message;
   }
 
+  console.log("Final error message to display:", errorMessage); // Added log
   toast.error(errorMessage);
   return new Error(errorMessage);
 };
@@ -40,6 +42,7 @@ const handleApiError = (error: unknown): Error => {
 // Register a new user
 export const registerUser = async (userData: UserData) => {
   try {
+    console.log("Attempting to register user with data:", userData); // Added log
     const response = await apiClient.post("/users/register", userData);
     return response.data;
   } catch (error) {

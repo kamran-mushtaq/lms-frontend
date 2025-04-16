@@ -113,7 +113,7 @@ export function OtpVerificationForm({
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
         }/users/resend-otp/${effectiveUserId}`
       );
-      toast.success("A new OTP has been sent to your email.");
+      toast.success("A new OTP has been sent to your email and WhatsApp.");
 
       // Set a cooldown period before allowing another resend
       setResendCooldown(60); // 60-second cooldown
@@ -148,8 +148,8 @@ export function OtpVerificationForm({
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold">Verify Your Email</h1>
         <p className="text-balance text-sm text-muted-foreground">
-          We've sent a verification code to your email address. Please enter it
-          below.
+          We've sent a verification code to your email address and WhatsApp number.
+          Please enter it below.
         </p>
       </div>
 
@@ -195,10 +195,8 @@ export function OtpVerificationForm({
 
       <div className="text-center">
         <p className="text-sm text-muted-foreground mb-2">
-          Didn&apos;t receive a code?
+          Didn&apos;t receive the code via email or WhatsApp?
         </p>
-        <p>Don&apos;t worry if you haven&apos;t received the code.</p>
-        <p>You&apos;ll receive a new code shortly.</p>
         <Button
           variant="outline"
           onClick={handleResendOtp}

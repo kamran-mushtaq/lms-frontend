@@ -12,6 +12,19 @@ const nextConfig = {
       // !! WARN !!
       ignoreBuildErrors: true,
     },
+
+    // Add image configuration
+    images: {
+      remotePatterns: [
+        {
+          protocol: 'http', // or 'https' if your backend uses it
+          hostname: 'localhost',
+          port: '3005', // Specify the port
+          pathname: '/api/uploads/**', // Allow any path under /api/uploads
+        },
+        // Add other allowed domains here if needed
+      ],
+    },
   }
   
   export default nextConfig;  // Use ES module export instead of module.exports

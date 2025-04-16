@@ -292,36 +292,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         position: "top-center"
       });
 
-      // Redirect based on user type with a slight delay to ensure state is updated
-      setTimeout(() => {
-        let redirectPath = "/";
-
-        switch (userData.type) {
-          case "admin":
-            redirectPath = "/admin/dashboard";
-            break;
-          case "teacher":
-            redirectPath = "/teacher/dashboard";
-            break;
-          case "parent":
-            redirectPath = "/parent/dashboard";
-            break;
-          case "student":
-            // For students, check aptitude test first
-            if (userWithStatus.aptitudeTestStatus?.passed) {
-              redirectPath = "/student/dashboard";
+      // Redirect based on user type using Next.js router for client-side navigation
+      let redirectPath = "/";
+      switch (userData.type) {
+        case "admin":
+          redirectPath = "/admin/dashboard";
+          break;
+        case "teacher":
+          redirectPath = "/teacher/dashboard";
+          break;
+        case "parent":
+          // Check if parent needs OTP verification (though this might be handled elsewhere now)
+          if (!userWithStatus.isVerified) {
+             // Redirect to OTP page if not verified
+             // Note: The verifyOtp function also handles login after verification.
+             // Consider if direct login after OTP is always desired.
+             redirectPath = `/verify-otp?userId=${userWithStatus._id}`;
+          } else {
+             redirectPath = "/parent/dashboard";
+          }
+          break;
+        case "student":
+          // --- NEW: Check status via backend API before redirect ---
+          let allRequiredTestsPassed = false; // Default to false (safer)
+          try {
+            console.log(`[AuthContext] Checking all required tests status via API for student ${userData._id}...`);
+            // Use the correct API URL and student ID
+            const checkUrl = `${API_URL}/enrollment/status/all-required-tests-passed/${userData._id}`;
+            // Make sure apiClient includes the auth header, or add it manually like below
+            const response = await apiClient.get(checkUrl, {
+              headers: { 'Authorization': `Bearer ${access_token}` } // Pass the token obtained during login
+            });
+            
+            // Check if the response has the expected boolean property
+            if (response.data && typeof response.data.allTestsPassed === 'boolean') {
+              allRequiredTestsPassed = response.data.allTestsPassed;
+              console.log(`[AuthContext] API check result: allTestsPassed=${allRequiredTestsPassed}`);
             } else {
-              redirectPath = "/aptitude-test";
+               console.error(`[AuthContext] Invalid or missing 'allTestsPassed' property in API response:`, response.data);
+               // Keep allRequiredTestsPassed as false if response is invalid
             }
-            break;
-          default:
-            redirectPath = "/login";
-            break;
-        }
+          } catch (apiError: any) {
+             console.error(`[AuthContext] Error calling all-required-tests-passed API:`, apiError.response?.data || apiError.message);
+             // Default to false (redirect to aptitude-test) on API error
+             allRequiredTestsPassed = false;
+          }
 
-        // Use window.location for full page reload to ensure clean state
-        window.location.href = redirectPath;
-      }, 100);
+          // Set redirect path based on the API result
+          if (allRequiredTestsPassed) {
+            redirectPath = "/student/dashboard";
+          } else {
+            redirectPath = "/aptitude-test";
+          }
+          console.log(`[AuthContext] Determined redirect path for student: ${redirectPath}`);
+          // --- END NEW LOGIC ---
+          break;
+        default:
+          // Fallback to login page if type is unknown or invalid
+          console.warn("Unknown user type for redirection:", userData.type);
+          redirectPath = "/login";
+          break;
+      }
+
+      // Use router.push for client-side navigation
+      router.push(redirectPath);
 
       return true;
     } catch (error: any) {

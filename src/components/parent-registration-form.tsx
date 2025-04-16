@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState, useEffect } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Country, City } from "country-state-city"; // Changed State to City
+import { ICountry, ICity } from "country-state-city"; // Changed IState to ICity
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -41,6 +43,8 @@ export function ParentRegistrationForm({
   const router = useRouter();
   const { registerParent, isLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [countries, setCountries] = useState<ICountry[]>([]);
+  const [cities, setCities] = useState<ICity[]>([]); // Renamed states to cities, changed type
 
   const form = useForm<ParentRegistrationFormValues>({
     resolver: zodResolver(parentRegistrationSchema),
@@ -53,7 +57,12 @@ export function ParentRegistrationForm({
       country: "",
       city: "",
       agreeTerms: false
-    }
+    },
+  });
+
+  const selectedCountryIsoCode = useWatch({
+    control: form.control,
+    name: "country",
   });
 
   const onSubmit = async (values: ParentRegistrationFormValues) => {
@@ -80,18 +89,20 @@ export function ParentRegistrationForm({
     }
   };
 
-  // Selection of some common countries
-  const countries = [
-    "Australia",
-    "Canada",
-    "China",
-    "Germany",
-    "India",
-    "Japan",
-    "United Kingdom",
-    "United States",
-    "Other"
-  ];
+  // Fetch countries on mount
+  useEffect(() => {
+    setCountries(Country.getAllCountries());
+  }, []);
+
+  // Fetch cities when country changes
+  useEffect(() => {
+    if (selectedCountryIsoCode) {
+      setCities(City.getCitiesOfCountry(selectedCountryIsoCode) || []); // Fetch cities, ensure array
+      form.setValue("city", ""); // Reset city when country changes
+    } else {
+      setCities([]); // Clear cities if no country selected
+    }
+  }, [selectedCountryIsoCode, form]);
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -202,8 +213,11 @@ export function ParentRegistrationForm({
                 <FormItem>
                   <FormLabel>Country</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    onValueChange={(value) => {
+                      field.onChange(value); // Update RHF state
+                    }}
+                    value={field.value} // Use value for controlled component
+                    defaultValue={field.value} // Keep defaultValue for initial render if needed
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -212,8 +226,8 @@ export function ParentRegistrationForm({
                     </FormControl>
                     <SelectContent>
                       {countries.map((country) => (
-                        <SelectItem key={country} value={country}>
-                          {country}
+                        <SelectItem key={country.isoCode} value={country.isoCode}>
+                          {country.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -229,10 +243,29 @@ export function ParentRegistrationForm({
               name="city"
               render={({ field }) => (
                 <FormItem>
+                  {/* Changed Label back to City */}
                   <FormLabel>City</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Karachi" {...field} />
-                  </FormControl>
+                   <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      defaultValue={field.value}
+                      // Disable if no country selected or no cities found/loading
+                      disabled={!selectedCountryIsoCode || cities.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                           {/* Changed placeholder back */}
+                          <SelectValue placeholder="Select city" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cities.map((city) => (
+                          <SelectItem key={city.name} value={city.name}> {/* Using city name for key and value */}
+                            {city.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   <FormMessage />
                 </FormItem>
               )}

@@ -55,7 +55,10 @@ export const studentRegistrationSchema = z.object({
     required_error: "Gender is required",
     invalid_type_error: "Gender must be 'male', 'female', or 'other'"
   }),
-  classId: z.string().min(1, { message: "Class is required" })
+  classId: z.string().min(1, { message: "Class is required" }),
+  subjects: z
+    .array(z.string())
+    .min(1, { message: "Please select at least one subject" })
 });
 
 export type ParentRegistrationFormValues = z.infer<

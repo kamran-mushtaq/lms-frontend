@@ -172,7 +172,7 @@ export const submitAssessmentResult = async (studentId: string, resultPayload: a
           aptitudeTestPassed: verifyResponse.data.aptitudeTestPassed
         });
         
-      } catch (updateError) {
+      } catch (updateError: any) {
         console.error('Error updating enrollment status:', updateError);
         
         if (updateError.response) {
@@ -182,7 +182,7 @@ export const submitAssessmentResult = async (studentId: string, resultPayload: a
     }
     
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error submitting assessment result:', error);
     
     // Detailed error logging
@@ -363,6 +363,8 @@ export const getPendingAptitudeTests = async (studentId: string) => {
 export const checkSubjectAccess = async (studentId: string, subjectId: string) => {
   try {
     const response = await apiClient.get(`/enrollment/access/${studentId}/${subjectId}`);
+    console.log(`Checking access for student ${studentId} to subject ${subjectId}:`, response);
+    
     return response.data.hasAccess;
   } catch (error) {
     console.error('Error checking subject access:', error);
@@ -463,7 +465,7 @@ export const getStudentClasses = async (studentId: string) => {
     
     // Fetch full class details for each class
     const classes = await Promise.all(
-      classIds.map(async (classId: string) => {
+      classIds.map(async (classId: any) => {
         try {
           const response = await apiClient.get(`/classes/${classId}`);
           return response.data;
@@ -504,46 +506,22 @@ export const getStudentProgressOverview = async (studentId: string) => {
       throw new Error('Student ID is required');
     }
     
-    const response = await apiClient.get(`/student-progress/${studentId}/overview`);
+    const response = await apiClient.get(`/student-progress/${studentId}`);
     
-    // If backend doesn't have this endpoint implemented yet, create a placeholder response
-    if (!response.data) {
-      // Return a placeholder progress overview
-      return {
-        totalClasses: 0,
-        totalSubjects: 0,
-        totalChapters: 0,
-        completedChapters: 0,
-        overallProgress: 0,
-        averageScore: 0,
-        totalTimeSpentMinutes: 0,
-        lastAccessedAt: new Date().toISOString(),
-        activeStudyPlans: 0,
-        upcomingAssessments: 0
-      };
-    }
+    // Structure the progress overview
+    const progressOverview = {
+      studentId,
+      totalChapters: response.data.totalChapters || 0,
+      completedChapters: response.data.completedChapters || 0,
+      totalAssessments: response.data.totalAssessments || 0,
+      completedAssessments: response.data.completedAssessments || 0,
+      averageScore: response.data.averageScore || 0,
+      completionPercentage: response.data.completionPercentage || 0
+    };
     
-    return response.data;
-  } catch (error) {
+    return progressOverview;
+  } catch (error: any) {
     console.error('Error fetching student progress overview:', error);
-    
-    // If the endpoint doesn't exist yet, return a placeholder instead of throwing
-    if (error.response && error.response.status === 404) {
-      // Return a placeholder progress overview
-      return {
-        totalClasses: 0,
-        totalSubjects: 0,
-        totalChapters: 0,
-        completedChapters: 0,
-        overallProgress: 0,
-        averageScore: 0,
-        totalTimeSpentMinutes: 0,
-        lastAccessedAt: new Date().toISOString(),
-        activeStudyPlans: 0,
-        upcomingAssessments: 0
-      };
-    }
-    
     throw new Error('Failed to load student progress. Please try again later.');
   }
 };
@@ -557,7 +535,7 @@ export const getSubjectChapters = async (subjectId: string) => {
     
     const response = await apiClient.get(`/chapters/subject/${subjectId}`);
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching subject chapters:', error);
     
     // If endpoint doesn't exist yet, return empty array
@@ -578,7 +556,7 @@ export const getStudentSubjectProgress = async (studentId: string, subjectId: st
     
     const response = await apiClient.get(`/student-progress/${studentId}/subject/${subjectId}`);
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching student subject progress:', error);
     
     // If endpoint doesn't exist yet, return a placeholder
@@ -638,18 +616,17 @@ export const getRecentAssessmentResults = async (studentId: string, limit = 5) =
     // Get assessment results
     const results = await getStudentAssessmentResults(studentId);
     
-    // Sort by date (newest first) and limit
-    const sortedResults = results
-      .sort((a: any, b: any) => {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return dateB - dateA;
-      })
-      .slice(0, limit);
+    // Sort by submission date, most recent first
+    results.sort((a: any, b: any) => {
+      return new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime();
+    });
     
-    return sortedResults;
+    // Limit the number of results
+    const recentResults = results.slice(0, limit);
+    
+    return recentResults;
   } catch (error) {
     console.error('Error fetching recent assessment results:', error);
     return []; // Return empty array instead of throwing
-  }  
+  }
 };

@@ -10,6 +10,7 @@ import axios from "axios";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
 import { useAuth } from "@/contexts/AuthContext";
 import {
   studentRegistrationSchema,
@@ -21,7 +22,8 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage
+  FormMessage,
+  FormDescription // Added FormDescription
 } from "@/components/ui/form";
 import {
   Select,
@@ -46,6 +48,12 @@ interface ClassOption {
   displayName: string;
 }
 
+interface SubjectOption {
+  _id: string;
+  name: string;
+  displayName: string;
+}
+
 export function StudentRegistrationForm({
   className,
   ...props
@@ -56,6 +64,8 @@ export function StudentRegistrationForm({
   const [success, setSuccess] = useState(false);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [isClassesLoading, setIsClassesLoading] = useState(true);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [isSubjectsLoading, setIsSubjectsLoading] = useState(false);
 
   // Fetch available classes
   useEffect(() => {
@@ -86,14 +96,57 @@ export function StudentRegistrationForm({
       email: "",
       dob: new Date(Date.now() - 6 * 365 * 24 * 60 * 60 * 1000), // Default to 6 years ago
       gender: "male",
-      classId: ""
+      classId: "",
+      subjects: [] // Added default value for subjects
     }
   });
+
+  const selectedClassId = form.watch("classId");
+
+  // Fetch subjects when class changes
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      if (!selectedClassId) {
+        setSubjects([]);
+        form.setValue("subjects", []); // Clear subjects if no class selected
+        return;
+      }
+      try {
+        setIsSubjectsLoading(true);
+        const response = await axios.get(
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
+          }/subjects/class/${selectedClassId}`
+        );
+        const fetchedSubjects = response.data || [];
+        setSubjects(fetchedSubjects);
+        // Set all subjects as selected by default
+        form.setValue(
+          "subjects",
+          fetchedSubjects.map((s: SubjectOption) => s._id)
+        );
+      } catch (error) {
+        console.error("Error fetching subjects:", error);
+        toast.error("Failed to load subjects for the selected class");
+        setSubjects([]);
+        form.setValue("subjects", []);
+      } finally {
+        setIsSubjectsLoading(false);
+      }
+    };
+
+    fetchSubjects();
+  }, [selectedClassId, form]);
 
   const onSubmit = async (values: StudentRegistrationFormValues) => {
     setError(null);
     try {
-      const result = await registerStudent(values);
+      // Ensure subjects are included in the submission
+      const submissionValues = {
+        ...values,
+        subjects: values.subjects || []
+      };
+      const result = await registerStudent(submissionValues);
 
       if (result.success) {
         setSuccess(true);
@@ -122,8 +175,10 @@ export function StudentRegistrationForm({
       email: "",
       dob: new Date(Date.now() - 6 * 365 * 24 * 60 * 60 * 1000),
       gender: "male",
-      classId: ""
+      classId: "",
+      subjects: [] // Reset subjects
     });
+    setSubjects([]); // Clear subjects state
   };
 
   if (success) {
@@ -320,10 +375,75 @@ export function StudentRegistrationForm({
             />
           </div>
 
+          {/* Subjects Multi-Select Checkboxes */}
+          {selectedClassId && (
+            <FormField
+              control={form.control}
+              name="subjects"
+              render={() => (
+                <FormItem>
+                  <div className="mb-4">
+                    <FormLabel className="text-base">Subjects</FormLabel>
+                    <FormDescription>
+                      Select the subjects the student will be enrolled in.
+                    </FormDescription>
+                  </div>
+                  {isSubjectsLoading ? (
+                     <div className="flex items-center space-x-2">
+                        <Icons.spinner className="h-4 w-4 animate-spin" />
+                        <span>Loading subjects...</span>
+                     </div>
+                  ) : subjects.length > 0 ? (
+                    subjects.map((subject) => (
+                      <FormField
+                        key={subject._id}
+                        control={form.control}
+                        name="subjects"
+                        render={({ field }) => {
+                          return (
+                            <FormItem
+                              key={subject._id}
+                              className="flex flex-row items-start space-x-3 space-y-0 mb-2"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(subject._id)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([
+                                          ...field.value,
+                                          subject._id
+                                        ])
+                                      : field.onChange(
+                                          field.value?.filter(
+                                            (value) => value !== subject._id
+                                          )
+                                        );
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                {subject.displayName}
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    ))
+                  ) : (
+                     <p className="text-sm text-muted-foreground">No subjects found for this class.</p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
           <Button
             type="submit"
             className="w-full mt-4"
-            disabled={isLoading || isClassesLoading}
+            // Disable submit if classes or subjects are loading
+            disabled={isLoading || isClassesLoading || isSubjectsLoading}
           >
             {isLoading ? (
               <>
