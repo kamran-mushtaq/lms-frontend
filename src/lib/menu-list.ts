@@ -61,12 +61,12 @@ export function getMenuList(pathname: string): Group[] {
           icon: GraduationCap,
           submenus: []
         },
-        {
-          href: "guardian-student",
-          label: "Guardian Student",
-          icon: School,
-          submenus: []
-        }
+        // {
+        //   href: "guardian-student",
+        //   label: "Guardian Student",
+        //   icon: School,
+        //   submenus: []
+        // }
       ]
     },
     {
@@ -154,20 +154,26 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "System Settings",
       menus: [
         {
-          href: "notifications",
+          href: "#",
           label: "Notifications",
           icon: Bell,
           submenus: []
         },
+        // {
+        //   href: "feature-flags",
+        //   label: "Feature Flags",
+        //   icon: Flag,
+        //   submenus: []
+        // },
         {
-          href: "feature-flags",
-          label: "Feature Flags",
-          icon: Flag,
+          href: "#",
+          label: "Settings",
+          icon: Settings,
           submenus: []
         },
         {
-          href: "settings",
-          label: "Settings",
+          href: "#",
+          label: "Payment Management",
           icon: Settings,
           submenus: []
         }
