@@ -154,7 +154,7 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "System Settings",
       menus: [
         {
-          href: "/manage/#",
+          href: "#",
           label: "Notifications",
           icon: Bell,
           submenus: []
@@ -166,14 +166,14 @@ export function getMenuList(pathname: string): Group[] {
         //   submenus: []
         // },
         {
-          href: "/manage/#",
+          href: "#",
           label: "Settings",
           icon: Settings,
           submenus: []
         },
         {
-          href: "/manage/#",
-          label: "Payment Management",
+          href: "#",
+          label: "Payments",
           icon: Settings,
           submenus: []
         }

@@ -139,10 +139,10 @@ export default function EnrollmentsPage() {
       <div className="container-lg mx-auto py-6">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-3xl font-bold">Enrollment Management</h1>
-          <Button onClick={handleAddEnrollment}>
+          {/* <Button onClick={handleAddEnrollment}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Enrollment
-          </Button>
+          </Button> */}
         </div>
 
         <div className="flex flex-wrap gap-4 mb-6">
