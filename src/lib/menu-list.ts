@@ -39,7 +39,7 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "Overview",
       menus: [
         {
-          href: "dashboard",
+          href: "/manage/dashboard",
           label: "Dashboard",
           icon: LayoutGrid,
           submenus: []
@@ -50,19 +50,19 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "User Management",
       menus: [
         {
-          href: "users",
+          href: "/manage/users",
           label: "Users",
           icon: Users,
           submenus: []
         },
         {
-          href: "enrollments",
+          href: "/manage/enrollments",
           label: "Enrollments",
           icon: GraduationCap,
           submenus: []
         },
         // {
-        //   href: "guardian-student",
+        //   href: "/manage/guardian-student",
         //   label: "Guardian Student",
         //   icon: School,
         //   submenus: []
@@ -73,37 +73,37 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "Academic Content",
       menus: [
         {
-          href: "classes",
+          href: "/manage/classes",
           label: "Classes",
           icon: ClipboardList,
           submenus: []
         },
         {
-          href: "subjects",
+          href: "/manage/subjects",
           label: "Subjects",
           icon: BookOpen,
           submenus: []
         },
         {
-          href: "chapters",
+          href: "/manage/chapters",
           label: "Chapters",
           icon: BookOpen,
           submenus: []
         },
         {
-          href: "lectures",
+          href: "/manage/lectures",
           label: "Lectures",
           icon: BookOpen,
           submenus: []
         },
         {
-          href: "study-plans",
+          href: "/manage/study-plans",
           label: "Study Plans",
           icon: ListTodo,
           submenus: []
         },
         {
-          href: "content-versions",
+          href: "/manage/content-versions",
           label: "Content Versions",
           icon: Layers,
           submenus: []
@@ -114,19 +114,19 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "Assessments",
       menus: [
         {
-          href: "assessments-management",
+          href: "/manage/assessments-management",
           label: "Assessments",
           icon: ClipboardList,
           submenus: []
         },
         {
-          href: "questions",
+          href: "/manage/questions",
           label: "Questions",
           icon: FileText,
           submenus: []
         },
         {
-          href: "assessment-templates",
+          href: "/manage/assessment-templates",
           label: "Assessment Templates",
           icon: FileText,
           submenus: []
@@ -137,13 +137,13 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "Attributes & Types",
       menus: [
         {
-          href: "attributes",
+          href: "/manage/attributes",
           label: "Attributes",
           icon: Tag,
           submenus: []
         },
         {
-          href: "attribute-types",
+          href: "/manage/attribute-types",
           label: "Attribute Types",
           icon: Tag,
           submenus: []
@@ -154,25 +154,25 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "System Settings",
       menus: [
         {
-          href: "#",
+          href: "/manage/#",
           label: "Notifications",
           icon: Bell,
           submenus: []
         },
         // {
-        //   href: "feature-flags",
+        //   href: "/manage/feature-flags",
         //   label: "Feature Flags",
         //   icon: Flag,
         //   submenus: []
         // },
         {
-          href: "#",
+          href: "/manage/#",
           label: "Settings",
           icon: Settings,
           submenus: []
         },
         {
-          href: "#",
+          href: "/manage/#",
           label: "Payment Management",
           icon: Settings,
           submenus: []
