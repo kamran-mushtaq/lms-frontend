@@ -120,7 +120,7 @@ export function ChapterReorderingDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl-old">
         <DialogHeader>
           <DialogTitle>Reorder Chapters</DialogTitle>
           <DialogDescription>

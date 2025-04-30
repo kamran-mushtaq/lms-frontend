@@ -196,7 +196,7 @@ export function ContentVersionForm({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-xl-old overflow-y-auto">
         <SheetHeader>
           <SheetTitle>
             {contentVersion ? "Edit Content Version" : "Create Content Version"}

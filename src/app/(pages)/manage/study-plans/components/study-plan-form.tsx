@@ -1,730 +1,680 @@
-// app/dashboard/study-plans/components/study-plan-form.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
-import * as z from "zod";
-import { toast } from "sonner";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle
-} from "@/components/ui/sheet";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon, X, Plus, Clock } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from "@/components/ui/popover";
-import { CalendarIcon, Plus, Trash } from "lucide-react";
-import { format } from "date-fns";
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import { studyPlanScheduleSchema, timeSlotSchema, benchmarkSchema } from "../schemas";
+import { StudyPlanSchedule, Student, Subject, TimeSlot, Benchmark } from "../types";
 import { cn } from "@/lib/utils";
 
-import {
-  StudyPlan,
-  createStudyPlan,
-  updateStudyPlan
-} from "../api/study-plans-api";
-import { useStudents, Student } from "../hooks/use-students";
-import { useSubjects, Subject } from "../hooks/use-subjects";
+const dayOptions = [
+    { value: 0, label: "Sunday" },
+    { value: 1, label: "Monday" },
+    { value: 2, label: "Tuesday" },
+    { value: 3, label: "Wednesday" },
+    { value: 4, label: "Thursday" },
+    { value: 5, label: "Friday" },
+    { value: 6, label: "Saturday" },
+];
 
-// Define schema for form validation
-const scheduleItemSchema = z.object({
-  dayOfWeek: z.number().min(0).max(6),
-  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: "Start time must be in format HH:MM"
-  }),
-  endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: "End time must be in format HH:MM"
-  }),
-  subjectId: z.string().min(1, { message: "Subject is required" }),
-  isActive: z.boolean().default(true)
-});
-
-const benchmarkSchema = z.object({
-  type: z.enum(["daily", "weekly", "monthly"]),
-  target: z.number().min(1, { message: "Target must be at least 1" }),
-  metric: z.enum(["minutes", "chapters", "assessments"]),
-  isActive: z.boolean().default(true),
-  guardianId: z.string().optional()
-});
-
-const studyPlanSchema = z.object({
-  studentId: z.string().min(1, { message: "Student is required" }),
-  weeklySchedule: z.array(scheduleItemSchema).min(1, {
-    message: "At least one schedule item is required"
-  }),
-  benchmarks: z.array(benchmarkSchema),
-  effectiveFrom: z.date(),
-  preferences: z.object({
-    reminderTime: z.string()
-  })
-});
-
-type FormValues = z.infer<typeof studyPlanSchema>;
-
-// Props interface
 interface StudyPlanFormProps {
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  plan: StudyPlan | null;
-  onSuccess: (message: string) => void;
-  onError: (error: Error) => void;
+    students: Student[];
+    subjects: Subject[];
+    initialData?: StudyPlanSchedule;
+    onSubmitAction: (data: StudyPlanSchedule) => Promise<void>; // Main prop name
+    onSubmit?: never; // Prevent using old name
+    onCancelAction: () => void; // Main prop name
+    onCancel?: never; // Prevent using old name
+    isLoading: boolean;
+    studentId?: string;
 }
 
-const dayOptions = [
-  { value: 0, label: "Sunday" },
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" }
-];
-
-const reminderOptions = [
-  { value: "5min", label: "5 minutes before" },
-  { value: "15min", label: "15 minutes before" },
-  { value: "30min", label: "30 minutes before" },
-  { value: "1hour", label: "1 hour before" },
-  { value: "2hour", label: "2 hours before" },
-  { value: "1day", label: "1 day before" }
-];
-
 export function StudyPlanForm({
-  open,
-  setOpen,
-  plan,
-  onSuccess,
-  onError
+    students,
+    subjects,
+    initialData,
+    onSubmitAction, // Changed from onSubmit
+    onCancelAction, // Changed from onCancel
+    isLoading,
+    studentId: preselectedStudentId,
 }: StudyPlanFormProps) {
-  const { students, isLoading: studentsLoading } = useStudents();
-  const { subjects, isLoading: subjectsLoading } = useSubjects();
-  const [selectedTab, setSelectedTab] = useState("schedule");
+    const [selectedStudentId, setSelectedStudentId] = useState<string | undefined>(
+        preselectedStudentId || initialData?.studentId
+    );
 
-  // Create form
-  const form = useForm<FormValues>({
-    resolver: zodResolver(studyPlanSchema),
-    defaultValues: {
-      studentId: "",
-      weeklySchedule: [
-        {
-          dayOfWeek: 1,
-          startTime: "09:00",
-          endTime: "10:30",
-          subjectId: "",
-          isActive: true
+    // Filter subjects by selected student's enrolled classes
+    const filteredSubjects = selectedStudentId
+        ? subjects.filter(subject => {
+            const student = students.find(s => s.id === selectedStudentId);
+            return student && student.enrolledClasses.includes(subject.classId);
+        })
+        : [];
+
+    // Form definition with Zod validation
+    const form = useForm<StudyPlanSchedule>({
+        resolver: zodResolver(studyPlanScheduleSchema),
+        defaultValues: initialData || {
+            studentId: selectedStudentId || "",
+            weeklySchedule: [],
+            benchmarks: [],
+            isActive: true,
+            effectiveFrom: new Date().toISOString().split('T')[0],
+        },
+    });
+
+    // Field arrays for weekly schedule and benchmarks
+    const {
+        fields: timeSlotFields,
+        append: appendTimeSlot,
+        remove: removeTimeSlot,
+    } = useFieldArray({
+        control: form.control,
+        name: "weeklySchedule",
+    });
+
+    const {
+        fields: benchmarkFields,
+        append: appendBenchmark,
+        remove: removeBenchmark,
+    } = useFieldArray({
+        control: form.control,
+        name: "benchmarks",
+    });
+
+    // Handle student change
+    useEffect(() => {
+        if (selectedStudentId) {
+            form.setValue("studentId", selectedStudentId);
         }
-      ],
-      benchmarks: [
-        {
-          type: "daily",
-          target: 60,
-          metric: "minutes",
-          isActive: true
-        }
-      ],
-      effectiveFrom: new Date(),
-      preferences: {
-        reminderTime: "30min"
-      }
-    }
-  });
+    }, [selectedStudentId, form]);
 
-  // Set up field arrays for dynamic form fields
-  const {
-    fields: scheduleFields,
-    append: appendSchedule,
-    remove: removeSchedule
-  } = useFieldArray({
-    control: form.control,
-    name: "weeklySchedule"
-  });
+    // Format time from 24h format to 12h format with AM/PM
+    const formatTime = (time: string) => {
+        const [hour, minute] = time.split(":").map(Number);
+        const period = hour >= 12 ? "PM" : "AM";
+        const hour12 = hour % 12 || 12;
+        return `${hour12}:${minute.toString().padStart(2, "0")} ${period}`;
+    };
 
-  const {
-    fields: benchmarkFields,
-    append: appendBenchmark,
-    remove: removeBenchmark
-  } = useFieldArray({
-    control: form.control,
-    name: "benchmarks"
-  });
+    // Get day name from day number
+    const getDayName = (day: number) => {
+        return dayOptions.find(d => d.value === day)?.label || "Unknown";
+    };
 
-  // Update form values when editing a plan
-  useEffect(() => {
-    if (plan) {
-      form.reset({
-        studentId: plan.studentId,
-        weeklySchedule: plan.weeklySchedule,
-        benchmarks: plan.benchmarks,
-        effectiveFrom: new Date(plan.effectiveFrom),
-        preferences: plan.preferences
-      });
-    } else {
-      form.reset({
-        studentId: "",
-        weeklySchedule: [
-          {
-            dayOfWeek: 1,
-            startTime: "09:00",
-            endTime: "10:30",
-            subjectId: "",
-            isActive: true
-          }
-        ],
-        benchmarks: [
-          {
-            type: "daily",
-            target: 60,
-            metric: "minutes",
-            isActive: true
-          }
-        ],
-        effectiveFrom: new Date(),
-        preferences: {
-          reminderTime: "30min"
-        }
-      });
-    }
-  }, [plan, form]);
+    // Handle form submission
+    const onSubmitForm = async (data: StudyPlanSchedule) => {
+        await onSubmitAction(data); // Changed from onSubmit
+    };
 
-  const onSubmit = async (data: FormValues) => {
-    try {
-      if (plan && plan._id) {
-        // Update existing plan - note: API doesn't provide direct plan update
-        // so we'll need to adapt this based on your backend requirements
-        toast.info(
-          "Your API doesn't have a direct endpoint for updating study plans. Please implement as needed."
-        );
-        onSuccess("Operation recorded but may require API adjustment");
-      } else {
-        // Create new plan
-        await createStudyPlan(data.studentId, {
-          weeklySchedule: data.weeklySchedule,
-          benchmarks: data.benchmarks,
-          effectiveFrom: data.effectiveFrom.toISOString(),
-          preferences: data.preferences
-        });
-        onSuccess("Study plan created successfully");
-      }
-    } catch (error) {
-      onError(error as Error);
-    }
-  };
+    return (
+        <Card className="w-full">
+            <CardHeader>
+                <CardTitle>{initialData ? "Edit Study Plan" : "Create Study Plan"}</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Tabs defaultValue="schedule" className="w-full">
+                    <TabsList className="mb-4">
+                        <TabsTrigger value="schedule">Schedule</TabsTrigger>
+                        <TabsTrigger value="benchmarks">Benchmarks</TabsTrigger>
+                        <TabsTrigger value="settings">Settings</TabsTrigger>
+                    </TabsList>
 
-  return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>
-            {plan ? "Edit Study Plan" : "Create Study Plan"}
-          </SheetTitle>
-          <SheetDescription>
-            {plan
-              ? "Update the study plan details below."
-              : "Fill in the form below to create a new study plan."}
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="py-4">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <Tabs
-                defaultValue="schedule"
-                onValueChange={setSelectedTab}
-                value={selectedTab}
-              >
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="student">Student</TabsTrigger>
-                  <TabsTrigger value="schedule">Schedule</TabsTrigger>
-                  <TabsTrigger value="benchmarks">Benchmarks</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="student" className="space-y-4 mt-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Student Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="studentId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Student</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              value={field.value}
-                              disabled={studentsLoading || !!plan}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a student" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {students &&
-                                  students.map((student: Student) => (
-                                    <SelectItem
-                                      key={student._id}
-                                      value={student._id}
-                                    >
-                                      {student.name}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="effectiveFrom"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>Effective From</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                      "w-full pl-3 text-left font-normal",
-                                      !field.value && "text-muted-foreground"
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmitForm)} className="space-y-6">
+                            <TabsContent value="schedule" className="space-y-6">
+                                {/* Student Selection */}
+                                <FormField
+                                    control={form.control}
+                                    name="studentId"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Student</FormLabel>
+                                            <Select
+                                                disabled={Boolean(preselectedStudentId) || isLoading}
+                                                onValueChange={(value) => {
+                                                    field.onChange(value);
+                                                    setSelectedStudentId(value);
+                                                }}
+                                                defaultValue={field.value}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select a student" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {students.map((student) => (
+                                                        <SelectItem key={student.id} value={student.id}>
+                                                            {student.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
                                     )}
-                                  >
-                                    {field.value ? (
-                                      format(field.value, "PPP")
-                                    ) : (
-                                      <span>Pick a date</span>
-                                    )}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                className="w-auto p-0"
-                                align="start"
-                              >
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
-                                  initialFocus
                                 />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
 
-                      <FormField
-                        control={form.control}
-                        name="preferences.reminderTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Reminder Time</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select reminder time" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {reminderOptions.map((option) => (
-                                  <SelectItem
-                                    key={option.value}
-                                    value={option.value}
-                                  >
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormDescription>
-                              When to send reminders before scheduled sessions
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                                {/* Effective Dates */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Effective From Date */}
+                                    <FormField
+                                        control={form.control}
+                                        name="effectiveFrom"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-col">
+                                                <FormLabel>Start Date</FormLabel>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <FormControl>
+                                                            <Button
+                                                                variant="outline"
+                                                                className={cn(
+                                                                    "pl-3 text-left font-normal",
+                                                                    !field.value && "text-muted-foreground"
+                                                                )}
+                                                                disabled={isLoading}
+                                                            >
+                                                                {field.value ? (
+                                                                    format(new Date(field.value), "PPP")
+                                                                ) : (
+                                                                    <span>Pick a date</span>
+                                                                )}
+                                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                            </Button>
+                                                        </FormControl>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                        <Calendar
+                                                            mode="single"
+                                                            selected={field.value ? new Date(field.value) : undefined}
+                                                            onSelect={(date) => field.onChange(date ? date.toISOString().split('T')[0] : "")}
+                                                            disabled={(date) => date < new Date("1900-01-01")}
+                                                            initialFocus
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
 
-                <TabsContent value="schedule" className="space-y-4 mt-4">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle>Weekly Schedule</CardTitle>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          appendSchedule({
-                            dayOfWeek: 1,
-                            startTime: "09:00",
-                            endTime: "10:30",
-                            subjectId: "",
-                            isActive: true
-                          })
-                        }
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Session
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {scheduleFields.map((field, index) => (
-                        <div
-                          key={field.id}
-                          className="space-y-4 p-4 border rounded-md relative"
-                        >
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute top-2 right-2 h-6 w-6 p-0 text-red-600"
-                            onClick={() => removeSchedule(index)}
-                            disabled={scheduleFields.length === 1}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
+                                    {/* Effective Until Date (Optional) */}
+                                    <FormField
+                                        control={form.control}
+                                        name="effectiveUntil"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-col">
+                                                <FormLabel>End Date (Optional)</FormLabel>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <FormControl>
+                                                            <Button
+                                                                variant="outline"
+                                                                className={cn(
+                                                                    "pl-3 text-left font-normal",
+                                                                    !field.value && "text-muted-foreground"
+                                                                )}
+                                                                disabled={isLoading}
+                                                            >
+                                                                {field.value ? (
+                                                                    format(new Date(field.value), "PPP")
+                                                                ) : (
+                                                                    <span>No end date</span>
+                                                                )}
+                                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                            </Button>
+                                                        </FormControl>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                        <Calendar
+                                                            mode="single"
+                                                            selected={field.value ? new Date(field.value) : undefined}
+                                                            onSelect={(date) => field.onChange(date ? date.toISOString().split('T')[0] : "")}
+                                                            disabled={(date) => {
+                                                                const startDate = form.getValues("effectiveFrom");
+                                                                return startDate ? date < new Date(startDate) : date < new Date();
+                                                            }}
+                                                            initialFocus
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
 
-                          <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                              control={form.control}
-                              name={`weeklySchedule.${index}.dayOfWeek`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Day of Week</FormLabel>
-                                  <Select
-                                    onValueChange={(value) =>
-                                      field.onChange(Number(value))
-                                    }
-                                    defaultValue={field.value.toString()}
-                                    value={field.value.toString()}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select day" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {dayOptions.map((day) => (
-                                        <SelectItem
-                                          key={day.value}
-                                          value={day.value.toString()}
+                                {/* Weekly Schedule */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <FormLabel className="text-base">Weekly Schedule</FormLabel>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => appendTimeSlot({
+                                                dayOfWeek: 1, // Monday
+                                                startTime: "14:00",
+                                                endTime: "15:30",
+                                                subjectId: filteredSubjects[0]?.id || "",
+                                                isActive: true,
+                                            })}
+                                            disabled={isLoading || !selectedStudentId || filteredSubjects.length === 0}
                                         >
-                                          {day.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                                            <Plus className="mr-1 h-4 w-4" /> Add Time Slot
+                                        </Button>
+                                    </div>
+                                    <FormDescription>
+                                        Define weekly study time slots for different subjects
+                                    </FormDescription>
 
-                            <FormField
-                              control={form.control}
-                              name={`weeklySchedule.${index}.subjectId`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Subject</FormLabel>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                    value={field.value}
-                                    disabled={subjectsLoading}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select a subject" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {subjects &&
-                                        subjects.map((subject: Subject) => (
-                                          <SelectItem
-                                            key={subject._id}
-                                            value={subject._id}
-                                          >
-                                            {subject.displayName}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
+                                    {timeSlotFields.length === 0 ? (
+                                        <div className="text-center py-8 border rounded-md border-dashed text-muted-foreground">
+                                            No time slots added yet. Add your first time slot above.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {timeSlotFields.map((field, index) => (
+                                                <div key={field.id} className="flex items-start gap-3 p-3 border rounded-md">
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1">
+                                                        {/* Day of Week */}
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`weeklySchedule.${index}.dayOfWeek`}
+                                                            render={({ field }) => (
+                                                                <FormItem>
+                                                                    <FormLabel>Day</FormLabel>
+                                                                    <Select
+                                                                        onValueChange={(value) => field.onChange(Number(value))}
+                                                                        defaultValue={field.value.toString()}
+                                                                        disabled={isLoading}
+                                                                    >
+                                                                        <FormControl>
+                                                                            <SelectTrigger>
+                                                                                <SelectValue placeholder="Select day" />
+                                                                            </SelectTrigger>
+                                                                        </FormControl>
+                                                                        <SelectContent>
+                                                                            {dayOptions.map((day) => (
+                                                                                <SelectItem key={day.value} value={day.value.toString()}>
+                                                                                    {day.label}
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
 
-                          <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                              control={form.control}
-                              name={`weeklySchedule.${index}.startTime`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Start Time</FormLabel>
-                                  <FormControl>
-                                    <Input type="time" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                                                        {/* Start Time */}
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`weeklySchedule.${index}.startTime`}
+                                                            render={({ field }) => (
+                                                                <FormItem>
+                                                                    <FormLabel>Start Time</FormLabel>
+                                                                    <div className="flex items-center">
+                                                                        <FormControl>
+                                                                            <Input
+                                                                                {...field}
+                                                                                type="time"
+                                                                                disabled={isLoading}
+                                                                            />
+                                                                        </FormControl>
+                                                                    </div>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
 
-                            <FormField
-                              control={form.control}
-                              name={`weeklySchedule.${index}.endTime`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>End Time</FormLabel>
-                                  <FormControl>
-                                    <Input type="time" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
+                                                        {/* End Time */}
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`weeklySchedule.${index}.endTime`}
+                                                            render={({ field }) => (
+                                                                <FormItem>
+                                                                    <FormLabel>End Time</FormLabel>
+                                                                    <div className="flex items-center">
+                                                                        <FormControl>
+                                                                            <Input
+                                                                                {...field}
+                                                                                type="time"
+                                                                                disabled={isLoading}
+                                                                            />
+                                                                        </FormControl>
+                                                                    </div>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
 
-                          <FormField
-                            control={form.control}
-                            name={`weeklySchedule.${index}.isActive`}
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between space-x-3 space-y-0">
-                                <FormLabel>Active</FormLabel>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      ))}
-                      {scheduleFields.length === 0 && (
-                        <div className="text-center py-4 text-muted-foreground">
-                          No sessions added. Click the button above to add a
-                          session.
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                                                        {/* Subject */}
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`weeklySchedule.${index}.subjectId`}
+                                                            render={({ field }) => (
+                                                                <FormItem className="col-span-3">
+                                                                    <FormLabel>Subject</FormLabel>
+                                                                    <Select
+                                                                        onValueChange={field.onChange}
+                                                                        defaultValue={field.value}
+                                                                        disabled={isLoading || filteredSubjects.length === 0}
+                                                                    >
+                                                                        <FormControl>
+                                                                            <SelectTrigger>
+                                                                                <SelectValue placeholder="Select subject" />
+                                                                            </SelectTrigger>
+                                                                        </FormControl>
+                                                                        <SelectContent>
+                                                                            {filteredSubjects.map((subject) => (
+                                                                                <SelectItem key={subject.id} value={subject.id}>
+                                                                                    {subject.displayName}
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
 
-                <TabsContent value="benchmarks" className="space-y-4 mt-4">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle>Study Benchmarks</CardTitle>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          appendBenchmark({
-                            type: "daily",
-                            target: 60,
-                            metric: "minutes",
-                            isActive: true
-                          })
-                        }
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Benchmark
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {benchmarkFields.map((field, index) => (
-                        <div
-                          key={field.id}
-                          className="space-y-4 p-4 border rounded-md relative"
-                        >
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute top-2 right-2 h-6 w-6 p-0 text-red-600"
-                            onClick={() => removeBenchmark(index)}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
+                                                        {/* Active Status */}
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`weeklySchedule.${index}.isActive`}
+                                                            render={({ field }) => (
+                                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 mt-4">
+                                                                    <FormControl>
+                                                                        <Checkbox
+                                                                            checked={field.value}
+                                                                            onCheckedChange={field.onChange}
+                                                                            disabled={isLoading}
+                                                                        />
+                                                                    </FormControl>
+                                                                    <div className="space-y-1 leading-none">
+                                                                        <FormLabel>
+                                                                            Active
+                                                                        </FormLabel>
+                                                                    </div>
+                                                                </FormItem>
+                                                            )}
+                                                        />
+                                                    </div>
 
-                          <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                              control={form.control}
-                              name={`benchmarks.${index}.type`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Frequency</FormLabel>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                    value={field.value}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select frequency" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="daily">
-                                        Daily
-                                      </SelectItem>
-                                      <SelectItem value="weekly">
-                                        Weekly
-                                      </SelectItem>
-                                      <SelectItem value="monthly">
-                                        Monthly
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                                                    {/* Remove button */}
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="shrink-0 mt-6"
+                                                        onClick={() => removeTimeSlot(index)}
+                                                        disabled={isLoading}
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
 
-                            <FormField
-                              control={form.control}
-                              name={`benchmarks.${index}.metric`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Metric</FormLabel>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                    value={field.value}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select metric" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="minutes">
-                                        Minutes Studied
-                                      </SelectItem>
-                                      <SelectItem value="chapters">
-                                        Chapters Completed
-                                      </SelectItem>
-                                      <SelectItem value="assessments">
-                                        Assessments Taken
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
+                            </TabsContent>
 
-                          <FormField
-                            control={form.control}
-                            name={`benchmarks.${index}.target`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Target</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    {...field}
-                                    onChange={(e) =>
-                                      field.onChange(Number(e.target.value))
-                                    }
-                                  />
-                                </FormControl>
-                                <FormDescription>
-                                  Target amount of the selected metric
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                            <TabsContent value="benchmarks" className="space-y-6">
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <FormLabel className="text-base">Study Benchmarks</FormLabel>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => appendBenchmark({
+                                                type: "weekly",
+                                                target: 5,
+                                                metric: "hours",
+                                                isActive: true,
+                                            })}
+                                            disabled={isLoading || !selectedStudentId}
+                                        >
+                                            <Plus className="mr-1 h-4 w-4" /> Add Benchmark
+                                        </Button>
+                                    </div>
+                                    <FormDescription>
+                                        Set study goals and benchmarks to track progress
+                                    </FormDescription>
 
-                          <FormField
-                            control={form.control}
-                            name={`benchmarks.${index}.isActive`}
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between space-x-3 space-y-0">
-                                <FormLabel>Active</FormLabel>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      ))}
-                      {benchmarkFields.length === 0 && (
-                        <div className="text-center py-4 text-muted-foreground">
-                          No benchmarks added. Click the button above to add a
-                          benchmark.
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                                    {benchmarkFields.length === 0 ? (
+                                        <div className="text-center py-8 border rounded-md border-dashed text-muted-foreground">
+                                            No benchmarks added yet. Add your first benchmark above.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {benchmarkFields.map((field, index) => (
+                                                <div key={field.id} className="flex items-start gap-3 p-3 border rounded-md">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+                                                        {/* Benchmark Type */}
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`benchmarks.${index}.type`}
+                                                            render={({ field }) => (
+                                                                <FormItem>
+                                                                    <FormLabel>Frequency</FormLabel>
+                                                                    <Select
+                                                                        onValueChange={field.onChange}
+                                                                        defaultValue={field.value}
+                                                                        disabled={isLoading}
+                                                                    >
+                                                                        <FormControl>
+                                                                            <SelectTrigger>
+                                                                                <SelectValue placeholder="Select frequency" />
+                                                                            </SelectTrigger>
+                                                                        </FormControl>
+                                                                        <SelectContent>
+                                                                            <SelectItem value="daily">Daily</SelectItem>
+                                                                            <SelectItem value="weekly">Weekly</SelectItem>
+                                                                            <SelectItem value="monthly">Monthly</SelectItem>
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
 
-              <div className="flex justify-end space-x-4 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  {plan ? "Update Study Plan" : "Create Study Plan"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
+                                                        {/* Target Value */}
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`benchmarks.${index}.target`}
+                                                            render={({ field }) => (
+                                                                <FormItem>
+                                                                    <FormLabel>Target Value</FormLabel>
+                                                                    <FormControl>
+                                                                        <Input
+                                                                            type="number"
+                                                                            min="1"
+                                                                            {...field}
+                                                                            onChange={(e) => field.onChange(Number(e.target.value))}
+                                                                            disabled={isLoading}
+                                                                        />
+                                                                    </FormControl>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
+
+                                                        {/* Metric Type */}
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`benchmarks.${index}.metric`}
+                                                            render={({ field }) => (
+                                                                <FormItem>
+                                                                    <FormLabel>Metric</FormLabel>
+                                                                    <Select
+                                                                        onValueChange={field.onChange}
+                                                                        defaultValue={field.value}
+                                                                        disabled={isLoading}
+                                                                    >
+                                                                        <FormControl>
+                                                                            <SelectTrigger>
+                                                                                <SelectValue placeholder="Select metric" />
+                                                                            </SelectTrigger>
+                                                                        </FormControl>
+                                                                        <SelectContent>
+                                                                            <SelectItem value="hours">Hours</SelectItem>
+                                                                            <SelectItem value="topics">Topics</SelectItem>
+                                                                            <SelectItem value="assessments">Assessments</SelectItem>
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
+
+                                                        {/* Notes */}
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`benchmarks.${index}.note`}
+                                                            render={({ field }) => (
+                                                                <FormItem>
+                                                                    <FormLabel>Notes (Optional)</FormLabel>
+                                                                    <FormControl>
+                                                                        <Textarea
+                                                                            placeholder="Add notes about this benchmark"
+                                                                            className="resize-none"
+                                                                            {...field}
+                                                                            value={field.value || ""}
+                                                                            disabled={isLoading}
+                                                                        />
+                                                                    </FormControl>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
+
+                                                        {/* Active Status */}
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`benchmarks.${index}.isActive`}
+                                                            render={({ field }) => (
+                                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 mt-4">
+                                                                    <FormControl>
+                                                                        <Checkbox
+                                                                            checked={field.value}
+                                                                            onCheckedChange={field.onChange}
+                                                                            disabled={isLoading}
+                                                                        />
+                                                                    </FormControl>
+                                                                    <div className="space-y-1 leading-none">
+                                                                        <FormLabel>
+                                                                            Active
+                                                                        </FormLabel>
+                                                                    </div>
+                                                                </FormItem>
+                                                            )}
+                                                        />
+                                                    </div>
+
+                                                    {/* Remove button */}
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="shrink-0 mt-6"
+                                                        onClick={() => removeBenchmark(index)}
+                                                        disabled={isLoading}
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="settings" className="space-y-6">
+                                <div className="space-y-4">
+                                    {/* Active Status */}
+                                    <FormField
+                                        control={form.control}
+                                        name="isActive"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-4 border rounded-md">
+                                                <FormControl>
+                                                    <Checkbox
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                        disabled={isLoading}
+                                                    />
+                                                </FormControl>
+                                                <div className="space-y-1 leading-none">
+                                                    <FormLabel className="text-base">
+                                                        Active Study Plan
+                                                    </FormLabel>
+                                                    <FormDescription>
+                                                        When active, this study plan will be shown to the student and used for progress tracking.
+                                                    </FormDescription>
+                                                </div>
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            </TabsContent>
+
+                            <div className="flex justify-end space-x-2 mt-6">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={onCancelAction} // Changed from onCancel
+                                    disabled={isLoading}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? "Saving..." : initialData ? "Update Plan" : "Create Plan"}
+                                </Button>
+                            </div>
+                        </form>
+                    </Form>
+                </Tabs>
+            </CardContent>
+        </Card>
+    );
 }

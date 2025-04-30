@@ -349,7 +349,7 @@ export function QuestionForm({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-1xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>
             {question ? "Edit Question" : "Create Question"}

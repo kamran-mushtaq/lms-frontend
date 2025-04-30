@@ -501,7 +501,7 @@ export function LectureForm({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+      <SheetContent className="w-full sm:w-1/2 lg:w-1/2 xl:w-1/2 h-screen overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{lecture ? "Edit Lecture" : "Create Lecture"}</SheetTitle>
           <SheetDescription>

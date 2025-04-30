@@ -208,7 +208,7 @@ export function LectureAssignment({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent className="w-full sm:max-w-xl md:max-w-2xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-xl-old md:max-w-2xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Manage Lectures for {chapter.displayName}</SheetTitle>
           <SheetDescription>
