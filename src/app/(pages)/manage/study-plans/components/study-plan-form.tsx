@@ -54,10 +54,8 @@ interface StudyPlanFormProps {
     students: Student[];
     subjects: Subject[];
     initialData?: StudyPlanSchedule;
-    onSubmitAction: (data: StudyPlanSchedule) => Promise<void>; // Main prop name
-    onSubmit?: never; // Prevent using old name
-    onCancelAction: () => void; // Main prop name
-    onCancel?: never; // Prevent using old name
+    onSubmit: (data: StudyPlanSchedule) => Promise<void>;
+    onCancel: () => void;
     isLoading: boolean;
     studentId?: string;
 }
@@ -66,32 +64,25 @@ export function StudyPlanForm({
     students,
     subjects,
     initialData,
-    onSubmitAction, // Changed from onSubmit
-    onCancelAction, // Changed from onCancel
+    onSubmit,
+    onCancel,
     isLoading,
     studentId: preselectedStudentId,
 }: StudyPlanFormProps) {
     const [selectedStudentId, setSelectedStudentId] = useState<string | undefined>(
-        preselectedStudentId || initialData?.studentId
+        preselectedStudentId || initialData?.studentId || undefined
     );
-
-    // Filter subjects by selected student's enrolled classes
-    const filteredSubjects = selectedStudentId
-        ? subjects.filter(subject => {
-            const student = students.find(s => s.id === selectedStudentId);
-            return student && student.enrolledClasses.includes(subject.classId);
-        })
-        : [];
 
     // Form definition with Zod validation
     const form = useForm<StudyPlanSchedule>({
         resolver: zodResolver(studyPlanScheduleSchema),
-        defaultValues: initialData || {
-            studentId: selectedStudentId || "",
+        defaultValues: {
+            studentId: "",  // Set empty string as default
             weeklySchedule: [],
             benchmarks: [],
             isActive: true,
             effectiveFrom: new Date().toISOString().split('T')[0],
+            ...initialData, // Spread initialData after default values
         },
     });
 
@@ -136,7 +127,29 @@ export function StudyPlanForm({
 
     // Handle form submission
     const onSubmitForm = async (data: StudyPlanSchedule) => {
-        await onSubmitAction(data); // Changed from onSubmit
+        await onSubmit(data);
+    };
+
+    // Handle student selection
+    const handleStudentChange = (value: string) => {
+        setSelectedStudentId(value);
+        form.setValue("studentId", value);
+        // Clear subject-related fields when student changes
+        form.setValue("weeklySchedule", []);
+    };
+
+    // Filter subjects by selected student's enrolled classes
+    const filteredSubjects = selectedStudentId ? subjects : [];
+
+    // Update the Add Time Slot button click handler
+    const handleAddTimeSlot = () => {
+        appendTimeSlot({
+            dayOfWeek: 1,
+            startTime: "09:00",
+            endTime: "10:30",
+            subjectId: "",
+            isActive: true,
+        });
     };
 
     return (
@@ -164,11 +177,8 @@ export function StudyPlanForm({
                                             <FormLabel>Student</FormLabel>
                                             <Select
                                                 disabled={Boolean(preselectedStudentId) || isLoading}
-                                                onValueChange={(value) => {
-                                                    field.onChange(value);
-                                                    setSelectedStudentId(value);
-                                                }}
-                                                defaultValue={field.value}
+                                                onValueChange={handleStudentChange}
+                                                value={field.value || undefined} // Important: use undefined when empty
                                             >
                                                 <FormControl>
                                                     <SelectTrigger>
@@ -286,14 +296,8 @@ export function StudyPlanForm({
                                             type="button"
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => appendTimeSlot({
-                                                dayOfWeek: 1, // Monday
-                                                startTime: "14:00",
-                                                endTime: "15:30",
-                                                subjectId: filteredSubjects[0]?.id || "",
-                                                isActive: true,
-                                            })}
-                                            disabled={isLoading || !selectedStudentId || filteredSubjects.length === 0}
+                                            onClick={handleAddTimeSlot}
+                                            disabled={isLoading || !selectedStudentId}
                                         >
                                             <Plus className="mr-1 h-4 w-4" /> Add Time Slot
                                         </Button>
@@ -659,7 +663,7 @@ export function StudyPlanForm({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={onCancelAction} // Changed from onCancel
+                                    onClick={onCancel}
                                     disabled={isLoading}
                                 >
                                     Cancel

@@ -22,7 +22,7 @@ export const useStudyPlans = (studentId?: string) => {
     isLoading: allPlansLoading,
     mutate: mutateAllPlans
   } = useSWR<StudyPlanSchedule[]>(
-    '/study-plans/schedules',
+    '/api/study-plans/schedules',
     fetchStudyPlans
   );
   
@@ -33,7 +33,7 @@ export const useStudyPlans = (studentId?: string) => {
     isLoading: studentPlansLoading,
     mutate: mutateStudentPlans
   } = useSWR<StudyPlanSchedule[]>(
-    studentId ? `/study-plans/schedules/${studentId}` : null,
+    studentId ? `/api/study-plans/schedules/${studentId}` : null,
     fetchStudyPlans
   );
   
@@ -44,7 +44,7 @@ export const useStudyPlans = (studentId?: string) => {
     isLoading: activePlanLoading,
     mutate: mutateActivePlan
   } = useSWR<StudyPlanSchedule>(
-    studentId ? `/study-plans/schedules/${studentId}/active` : null,
+    studentId ? `/api/study-plans/schedules/${studentId}/active` : null,
     fetchStudyPlans
   );
   

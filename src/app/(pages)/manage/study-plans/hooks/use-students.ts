@@ -1,4 +1,5 @@
 // app/(pages)/manage/study-plans/hooks/use-students.ts
+import { useMemo } from "react";
 import useSWR from "swr";
 import apiClient from "@/lib/api-client";
 import { Student } from "../types";
@@ -17,8 +18,10 @@ export const useStudents = () => {
     mutate 
   } = useSWR<Student[]>('/users/type/student', fetcher);
 
+  const students = useMemo(() => data || [], [data]);
+
   return {
-    students: data || [],
+    students,
     isLoading,
     isError: error,
     mutate,

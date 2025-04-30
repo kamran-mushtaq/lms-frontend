@@ -105,6 +105,7 @@ export default function StudyPlansPage() {
         setFormState({
             isOpen: true,
             type: "create",
+            data: undefined // Explicitly set to undefined for new plans
         });
     };
 
@@ -128,6 +129,15 @@ export default function StudyPlansPage() {
     // Handle plan form submission
     const handlePlanSubmit = async (data: StudyPlanSchedule) => {
         try {
+            if (!data.studentId) {
+                toast({
+                    title: "Error",
+                    description: "Please select a student.",
+                    variant: "destructive",
+                });
+                return;
+            }
+            
             if (formState.type === "create") {
                 await createPlan(data);
             } else {
@@ -169,13 +179,13 @@ export default function StudyPlansPage() {
         setSessionFormState({
             isOpen: true,
             type: "start",
-            data: slotInfo ? {
+            data: {
                 id: "",
                 studentId: selectedStudent || "",
                 subjectId: "",
-                startTime: slotInfo.start.toISOString(),
+                startTime: slotInfo?.start.toISOString() || new Date().toISOString(),
                 isCompleted: false
-            } : undefined
+            }
         });
     };
 
@@ -312,7 +322,7 @@ export default function StudyPlansPage() {
 
                         <Button
                             variant={activeSession ? "destructive" : "default"}
-                            onClick={activeSession ? handleEndSession : handleStartSession}
+                            onClick={(e) => activeSession ? handleEndSession() : handleStartSession()}
                             disabled={!selectedStudent}
                         >
                             <Clock className="h-4 w-4 mr-1" />
@@ -398,7 +408,7 @@ export default function StudyPlansPage() {
 
             {/* Study Plan Form - Side Sheet */}
             <Sheet open={formState.isOpen} onOpenChange={(open) => !open && handleClosePlanForm()}>
-                <SheetContent className="sm:max-w-xl-old">
+                <SheetContent className="sm:max-w-xl">
                     <SheetHeader>
                         <SheetTitle>{formState.type === "create" ? "Create Study Plan" : "Edit Study Plan"}</SheetTitle>
                         <SheetDescription>
@@ -423,7 +433,7 @@ export default function StudyPlansPage() {
 
             {/* Study Session Form - Side Sheet */}
             <Sheet open={sessionFormState.isOpen} onOpenChange={(open) => !open && handleCloseSessionForm()}>
-                <SheetContent className="sm:max-w-xl-old">
+                <SheetContent className="sm:max-w-xl">
                     <SheetHeader>
                         <SheetTitle>
                             {sessionFormState.type === "start"
