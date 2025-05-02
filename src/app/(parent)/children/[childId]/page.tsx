@@ -1,16 +1,50 @@
+// src/app/(parent)/children/[childId]/page.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
-import { useChildProgress } from "@/hooks/parent/use-child-progress";
 import ProgressOverview from "@/components/parent-dashboard/progress-overview";
 import SubjectProgress from "@/components/parent-dashboard/subject-progress";
-import StudyTimeChart from "@/components/parent-dashboard/study-time-chart";
+import StudyTimeAnalytics from "@/components/parent-dashboard/study-time-analytics";
 import AssessmentPerformance from "@/components/parent-dashboard/assessment-performance";
+import { useChildProgress } from "@/hooks/parent/use-child-progress";
+
+interface Subject {
+    id: string;
+    name: string;
+    progress: number;
+    lastActivity: string;
+    status: string;
+}
+
+interface Activity {
+    type: string;
+    itemName: string;
+    subjectName: string;
+    timestamp: string;
+}
+
+interface Assessment {
+    id: string;
+    title: string;
+    subjectName: string;
+    dueDate: string;
+}
+
+interface ProgressData {
+    id: string;
+    name: string;
+    grade: string;
+    overallProgress: number;
+    enrolledSince: string;
+    subjects: Subject[];
+    recentActivity: Activity[];
+    upcomingAssessments: Assessment[];
+}
 
 export default function ChildProgressPage() {
     const params = useParams();
@@ -43,7 +77,7 @@ export default function ChildProgressPage() {
         );
     }
 
-    if (!progress) {
+    if (isError || !progress) {
         return (
             <div className="flex flex-col items-center justify-center h-[500px]">
                 <Icons.warning className="h-10 w-10 text-muted-foreground mb-4" />
@@ -85,7 +119,7 @@ export default function ChildProgressPage() {
                 </TabsContent>
 
                 <TabsContent value="study-time">
-                    <StudyTimeChart childId={childId} />
+                    <StudyTimeAnalytics childId={childId} />
                 </TabsContent>
 
                 <TabsContent value="assessments">

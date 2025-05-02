@@ -1,9 +1,26 @@
+// src/components/parent-dashboard/children-overview.tsx
 import { Card, CardContent } from "@/components/ui/card";
-import { Child } from "@/types/parent-dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Check, Clock, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface Subject {
+  id: string;
+  name: string;
+  progress: number;
+  lastActivity: string;
+  status: string;
+}
+
+interface Child {
+  id: string;
+  name: string;
+  grade: string;
+  age: number;
+  subjects: Subject[];
+  progress: number;
+}
 
 interface ChildrenOverviewProps {
   children: Child[];
@@ -71,7 +88,7 @@ export default function ChildrenOverview({
         <CardContent className="p-6 text-center">
           <h3 className="text-lg font-medium mb-2">No Children Added</h3>
           <p className="text-muted-foreground">
-            You haven't added any children to your account yet. Add a child to start tracking their academic progress.
+           You haven't added any children to your account yet. Add a child to start tracking their academic progress.
           </p>
         </CardContent>
       </Card>

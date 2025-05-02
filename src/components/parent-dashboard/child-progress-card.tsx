@@ -1,8 +1,25 @@
+// src/components/parent-dashboard/child-progress-card.tsx
 import { format } from "date-fns";
 import { Check, Clock, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Child, Subject } from "@/types/parent-dashboard";
+
+interface Subject {
+  id: string;
+  name: string;
+  progress: number;
+  lastActivity: string;
+  status: string;
+}
+
+interface Child {
+  id: string;
+  name: string;
+  grade: string;
+  age: number;
+  subjects: Subject[];
+  progress: number;
+}
 
 interface ChildProgressCardProps {
   child: Child;

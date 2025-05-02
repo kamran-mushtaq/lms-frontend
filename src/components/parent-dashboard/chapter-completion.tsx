@@ -1,3 +1,4 @@
+// src/components/parent-dashboard/chapter-completion.tsx
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,14 @@ export default function ChapterCompletion({ chapters }: ChapterCompletionProps) 
             default: return "Unknown";
         }
     };
+
+    if (chapters.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-10 border rounded-lg">
+                <p className="text-muted-foreground">No chapters available for this subject</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-4">

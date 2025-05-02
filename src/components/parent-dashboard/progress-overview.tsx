@@ -1,13 +1,46 @@
+// src/components/parent-dashboard/progress-overview.tsx
 import { format } from "date-fns";
 import { BarChart, BookOpen, CheckCircle, Clock } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Assessment, ProgressOverview as ProgressOverviewType } from "@/types/parent-dashboard";
+
+interface Activity {
+    type: string;
+    itemName: string;
+    subjectName: string;
+    timestamp: string;
+}
+
+interface Assessment {
+    id: string;
+    title: string;
+    subjectName: string;
+    dueDate: string;
+}
+
+interface Subject {
+    id: string;
+    name: string;
+    progress: number;
+    lastActivity: string;
+    status: string;
+}
+
+interface ProgressOverviewData {
+    id: string;
+    name: string;
+    grade: string;
+    overallProgress: number;
+    enrolledSince: string;
+    subjects: Subject[];
+    recentActivity: Activity[];
+    upcomingAssessments: Assessment[];
+}
 
 interface ProgressOverviewProps {
-    data: ProgressOverviewType;
+    data: ProgressOverviewData;
 }
 
 export default function ProgressOverview({ data }: ProgressOverviewProps) {

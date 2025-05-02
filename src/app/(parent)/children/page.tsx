@@ -1,3 +1,4 @@
+// src/app/(parent)/children/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -10,84 +11,68 @@ import {
   CardHeader,
   CardTitle
 } from "@/components/ui/card";
-import { Plus, Eye, PenLine, BarChart } from "lucide-react";
+import { Plus, Eye, BarChart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ChildProgressCard from "@/components/parent-dashboard/child-progress-card";
-import { useAuth } from "@/contexts/AuthContext";
-import apiClient  from "@/lib/api-client";
-import { Child, Subject } from "@/types/parent-dashboard";
+import apiClient from "@/lib/api-client";
+
+interface Subject {
+  id: string;
+  name: string;
+  progress: number;
+  lastActivity: string;
+  status: string;
+}
+
+interface Child {
+  id: string;
+  name: string;
+  grade: string;
+  age: number;
+  subjects: Subject[];
+  progress: number;
+}
 
 export default function ChildrenListPage() {
   const [loading, setLoading] = useState(true);
   const [children, setChildren] = useState<Child[]>([]);
   const { toast } = useToast();
-  const { user } = useAuth();
 
   useEffect(() => {
     const fetchChildren = async () => {
       try {
         setLoading(true);
-        if (!user) return;
-
-        // Replace with actual API endpoint when backend is ready
+        // Fetch children from the API
         const response = await apiClient.get('/users/children');
-        setChildren(response.data);
+
+        if (Array.isArray(response.data)) {
+          setChildren(response.data);
+        } else {
+          toast({
+            title: "Error",
+            description: "Unexpected API response format. Please try again.",
+            variant: "destructive"
+          });
+          setChildren([]);
+        }
       } catch (error) {
-        console.error(error);
+        console.error("Error fetching children:", error);
         toast({
           title: "Error",
           description: "Failed to load children data. Please try again.",
           variant: "destructive"
         });
-
-        // For demonstration purposes, use mock data that matches our Child interface
-        const mockSubjects: Subject[] = [
-          {
-            id: "1",
-            name: "Mathematics",
-            progress: 85,
-            lastActivity: new Date().toISOString(),
-            status: "on_track"
-          },
-          {
-            id: "2",
-            name: "Science",
-            progress: 65,
-            lastActivity: new Date().toISOString(),
-            status: "needs_attention"
-          }
-        ];
-
-        const mockChildren: Child[] = [
-          {
-            id: "1",
-            name: "John Smith",
-            grade: "Grade 6",
-            age: 12,
-            subjects: mockSubjects,
-            progress: 78
-          },
-          {
-            id: "2",
-            name: "Emily Johnson",
-            grade: "Grade 4",
-            age: 10,
-            subjects: mockSubjects,
-            progress: 85
-          }
-        ];
-
-        setChildren(mockChildren);
+        setChildren([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchChildren();
-  }, [toast, user]);
+  }, [toast]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -178,7 +163,10 @@ export default function ChildrenListPage() {
                         <span className="font-medium">{child.subjects.length}</span>
                       </span>
                       <span>
-                        Tests this week: <span className="font-medium">2</span>
+                        Tests this week: <span className="font-medium">
+                          {/* This would ideally come from the API */}
+                          {Math.floor(Math.random() * 3) + 1}
+                        </span>
                       </span>
                     </div>
 

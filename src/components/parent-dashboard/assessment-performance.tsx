@@ -1,10 +1,11 @@
+// src/components/parent-dashboard/assessment-performance.tsx
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import  apiClient  from "@/lib/api-client";
+import apiClient from "@/lib/api-client";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Icons } from "@/components/icons";
 
@@ -40,38 +41,45 @@ interface SkillBreakdown {
     status: string;
 }
 
+interface AssessmentData {
+    completedAssessments: CompletedAssessment[];
+    trends: AssessmentTrend[];
+    subjectPerformance: SubjectPerformance[];
+    skillBreakdown: SkillBreakdown[];
+}
+
 export default function AssessmentPerformance({ childId, summaryView = false }: AssessmentPerformanceProps) {
     const [isLoading, setIsLoading] = useState(true);
-    const [isError, setIsError] = useState(false);
-    const [assessments, setAssessments] = useState<CompletedAssessment[]>([]);
-    const [trends, setTrends] = useState<AssessmentTrend[]>([]);
-    const [subjectPerformance, setSubjectPerformance] = useState<SubjectPerformance[]>([]);
-    const [skills, setSkills] = useState<SkillBreakdown[]>([]);
+    const [data, setData] = useState<AssessmentData>({
+        completedAssessments: [],
+        trends: [],
+        subjectPerformance: [],
+        skillBreakdown: []
+    });
     const { toast } = useToast();
 
     useEffect(() => {
         const fetchAssessmentData = async () => {
+            if (!childId) return;
+
             try {
                 setIsLoading(true);
+                // Fetch assessment data from the API
                 const response = await apiClient.get(`/assessment-results/student/${childId}`);
 
                 if (response.data) {
-                    if (response.data.completedAssessments) {
-                        setAssessments(response.data.completedAssessments);
-                    }
-                    if (response.data.assessments?.trend) {
-                        setTrends(response.data.assessments.trend);
-                    }
-                    if (response.data.assessments?.subjectPerformance) {
-                        setSubjectPerformance(response.data.assessments.subjectPerformance);
-                    }
-                    if (response.data.skillBreakdown) {
-                        setSkills(response.data.skillBreakdown);
-                    }
+                    // Process and format the data
+                    const assessmentData: AssessmentData = {
+                        completedAssessments: response.data.completedAssessments || [],
+                        trends: response.data.trends || [],
+                        subjectPerformance: response.data.subjectPerformance || [],
+                        skillBreakdown: response.data.skillBreakdown || []
+                    };
+
+                    setData(assessmentData);
                 }
             } catch (error) {
-                console.error(error);
-                setIsError(true);
+                console.error("Error fetching assessment data:", error);
                 toast({
                     title: "Error",
                     description: "Failed to load assessment data. Please try again.",
@@ -82,9 +90,7 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
             }
         };
 
-        if (childId) {
-            fetchAssessmentData();
-        }
+        fetchAssessmentData();
     }, [childId, toast]);
 
     const getStatusColor = (status: string) => {
@@ -127,13 +133,13 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
                                 <Skeleton key={i} className="h-16 w-full" />
                             ))}
                         </div>
-                    ) : assessments.length === 0 ? (
+                    ) : data.completedAssessments.length === 0 ? (
                         <div className="text-center py-6 text-muted-foreground">
                             <p>No completed assessments yet</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {assessments.slice(0, 3).map((assessment) => (
+                            {data.completedAssessments.slice(0, 3).map((assessment) => (
                                 <div key={assessment.id} className="flex items-center justify-between p-3 border rounded-md">
                                     <div>
                                         <p className="font-medium">{assessment.title}</p>
@@ -167,7 +173,12 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
         );
     }
 
-    if (isError || (assessments.length === 0 && trends.length === 0 && subjectPerformance.length === 0)) {
+    const hasNoData =
+        data.completedAssessments.length === 0 &&
+        data.trends.length === 0 &&
+        data.subjectPerformance.length === 0;
+
+    if (hasNoData) {
         return (
             <div className="flex flex-col items-center justify-center h-[300px] border rounded-lg p-6">
                 <Icons.warning className="h-10 w-10 text-muted-foreground mb-4" />
@@ -181,7 +192,7 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
 
     return (
         <div className="space-y-6">
-            {trends.length > 0 && (
+            {data.trends.length > 0 && (
                 <Card>
                     <CardHeader className="pb-2">
                         <CardTitle>Assessment Performance</CardTitle>
@@ -190,7 +201,7 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
                     <CardContent>
                         <div className="h-[300px]">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={trends}>
+                                <LineChart data={data.trends}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="month" />
                                     <YAxis domain={[0, 100]} />
@@ -205,7 +216,7 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
             )}
 
             <div className="grid gap-6 md:grid-cols-2">
-                {assessments.length > 0 && (
+                {data.completedAssessments.length > 0 && (
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle>Recent Assessments</CardTitle>
@@ -213,7 +224,7 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-3">
-                                {assessments.map((assessment) => (
+                                {data.completedAssessments.map((assessment) => (
                                     <div key={assessment.id} className="flex items-center justify-between p-3 border rounded-md">
                                         <div>
                                             <p className="font-medium">{assessment.title}</p>
@@ -231,7 +242,7 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
                     </Card>
                 )}
 
-                {subjectPerformance.length > 0 && (
+                {data.subjectPerformance.length > 0 && (
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle>Subject Performance</CardTitle>
@@ -240,7 +251,7 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
                         <CardContent>
                             <div className="h-[300px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={subjectPerformance}>
+                                    <BarChart data={data.subjectPerformance}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="subject" />
                                         <YAxis domain={[0, 100]} />
@@ -254,7 +265,7 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
                 )}
             </div>
 
-            {skills.length > 0 && (
+            {data.skillBreakdown.length > 0 && (
                 <Card>
                     <CardHeader className="pb-2">
                         <CardTitle>Skill Breakdown</CardTitle>
@@ -262,7 +273,7 @@ export default function AssessmentPerformance({ childId, summaryView = false }: 
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {skills.map((skill, index) => (
+                            {data.skillBreakdown.map((skill, index) => (
                                 <div key={index} className="space-y-2">
                                     <div className="flex justify-between">
                                         <p className="text-sm font-medium">{skill.skill}</p>

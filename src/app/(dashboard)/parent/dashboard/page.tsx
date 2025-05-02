@@ -1,3 +1,4 @@
+// src/app/(dashboard)/parent/dashboard/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -11,13 +12,30 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, BookOpen, GraduationCap, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import apiClient  from "@/lib/api-client";
-import { Child } from "@/types/parent-dashboard";
+import apiClient from "@/lib/api-client";
 import ChildrenOverview from "@/components/parent-dashboard/children-overview";
-import StudyTimeChart from "@/components/parent-dashboard/study-time-chart";
+import StudyTimeAnalytics from "@/components/parent-dashboard/study-time-analytics";
+import { useChildProgress } from "@/hooks/parent/use-child-progress";
+import { useStudyAnalytics } from "@/hooks/parent/use-study-analytics";
+import { useAssessmentResults } from "@/hooks/parent/use-assessment-results";
 import AssessmentPerformance from "@/components/parent-dashboard/assessment-performance";
 import UpcomingAssessments from "@/components/parent-dashboard/upcoming-assessments";
 import { Skeleton } from "@/components/ui/skeleton";
+
+interface Child {
+  id: string;
+  name: string;
+  grade: string;
+  age: number;
+  subjects: Array<{
+    id: string;
+    name: string;
+    progress: number;
+    lastActivity: string;
+    status: string;
+  }>;
+  progress: number;
+}
 
 interface DashboardStats {
   totalCourses: number;
@@ -25,12 +43,6 @@ interface DashboardStats {
   upcomingTests: number;
   studyTimeHours: number;
 }
-
-interface ComponentNameProps {
-  childId: string;
-  // other props...
-}
-
 
 export default function ParentDashboard() {
   const [loading, setLoading] = useState(true);
@@ -48,115 +60,61 @@ export default function ParentDashboard() {
     const fetchChildren = async () => {
       try {
         setLoading(true);
-        // API for getting children linked to the parent's account
+        // Get children linked to parent's account
         const response = await apiClient.get("/users/children");
         const data = response.data;
-        setChildren(data);
 
-        if (data.length > 0) {
+        if (Array.isArray(data) && data.length > 0) {
+          setChildren(data);
           setSelectedChildId(data[0].id);
-        }
 
-        // Get dashboard stats summary
-        const statsPromises = data.map(async (child: Child) => {
-          const childId = child.id;
+          // Get dashboard stats summary
+          const statsPromises = data.map(async (child: Child) => {
+            const childId = child.id;
+            // Get enrolled subjects and progress
+            const progressResponse = await apiClient.get(
+              `/student-progress/${childId}/overview`
+            );
+            return progressResponse.data;
+          });
 
-          // Get enrolled subjects
-          const progressResponse = await apiClient.get(
-            `/student-progress/${childId}/overview`
+          const childrenStats = await Promise.all(statsPromises);
+
+          // Aggregate stats from all children
+          const stats = childrenStats.reduce(
+            (acc, curr) => {
+              return {
+                totalCourses: acc.totalCourses + (curr.subjects?.length || 0),
+                activeCoursesCount: acc.activeCoursesCount + (curr.subjects?.filter((s: any) =>
+                  s.status === "in_progress" || s.status === "on_track" || s.status === "needs_attention"
+                ).length || 0),
+                upcomingTests: acc.upcomingTests + (curr.upcomingAssessments?.length || 0),
+                studyTimeHours: acc.studyTimeHours + ((curr.totalTimeSpentMinutes || 0) / 60)
+              };
+            },
+            {
+              totalCourses: 0,
+              activeCoursesCount: 0,
+              upcomingTests: 0,
+              studyTimeHours: 0
+            }
           );
 
-          return progressResponse.data;
-        });
-
-        const childrenStats = await Promise.all(statsPromises);
-
-        // Aggregate stats from all children
-        const stats = childrenStats.reduce(
-          (acc, curr) => {
-            return {
-              totalCourses: acc.totalCourses + curr.subjects.length,
-              activeCoursesCount: acc.activeCoursesCount + curr.subjects.filter((s: any) =>
-                s.status === "in_progress" || s.status === "on_track" || s.status === "needs_attention"
-              ).length,
-              upcomingTests: acc.upcomingTests + curr.upcomingAssessments.length,
-              studyTimeHours: acc.studyTimeHours + (curr.totalTimeSpentMinutes || 0) / 60
-            };
-          },
-          {
-            totalCourses: 0,
-            activeCoursesCount: 0,
-            upcomingTests: 0,
-            studyTimeHours: 0
-          }
-        );
-
-        setDashboardStats(stats);
+          setDashboardStats(stats);
+        } else {
+          setChildren([]);
+          toast({
+            title: "No children found",
+            description: "Add children to your account to see their progress",
+            variant: "default"
+          });
+        }
       } catch (error) {
         console.error(error);
         toast({
           title: "Error",
           description: "Failed to load children data. Please try again.",
           variant: "destructive"
-        });
-
-        // Set mock data for demonstration purposes
-        setChildren([
-          {
-            id: "1",
-            name: "John Smith",
-            grade: "Grade 6",
-            age: 12,
-            subjects: [
-              {
-                id: "1",
-                name: "Mathematics",
-                progress: 85,
-                lastActivity: new Date().toISOString(),
-                status: "on_track"
-              },
-              {
-                id: "2",
-                name: "Science",
-                progress: 65,
-                lastActivity: new Date().toISOString(),
-                status: "needs_attention"
-              }
-            ],
-            progress: 75
-          },
-          {
-            id: "2",
-            name: "Emily Johnson",
-            grade: "Grade 4",
-            age: 10,
-            subjects: [
-              {
-                id: "3",
-                name: "Mathematics",
-                progress: 90,
-                lastActivity: new Date().toISOString(),
-                status: "on_track"
-              },
-              {
-                id: "4",
-                name: "English",
-                progress: 80,
-                lastActivity: new Date().toISOString(),
-                status: "on_track"
-              }
-            ],
-            progress: 85
-          }
-        ]);
-
-        setSelectedChildId("1");
-
-        setDashboardStats({
-          totalCourses: 4,
-          activeCoursesCount: 4,
-          upcomingTests: 3,
-          studyTimeHours: 12.5
         });
       } finally {
         setLoading(false);
@@ -280,7 +238,6 @@ export default function ParentDashboard() {
               </>
             )}
           </div>
-
         </TabsContent>
 
         <TabsContent value="assessments" className="space-y-4">
@@ -288,7 +245,7 @@ export default function ParentDashboard() {
         </TabsContent>
 
         <TabsContent value="study-time" className="space-y-4">
-          {selectedChildId && <StudyTimeChart childId={selectedChildId} />}
+          {selectedChildId && <StudyTimeAnalytics childId={selectedChildId} />}
         </TabsContent>
       </Tabs>
     </div>

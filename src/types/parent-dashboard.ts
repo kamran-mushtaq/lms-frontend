@@ -1,49 +1,53 @@
-// Progress and child types
+// src/types/parent-dashboard.ts
+
+// Base Subject interface
 export interface Subject {
   id: string;
   name: string;
   progress: number;
   lastActivity: string;
-  status: "on_track" | "needs_attention" | "falling_behind";
+  status: string;
 }
 
-export interface Activity {
-  type: string;
-  subjectId: string;
-  subjectName: string;
-  itemName: string;
-  timestamp: string;
-}
-
-export interface Assessment {
+// Child overview interface
+export interface Child {
   id: string;
-  title: string;
-  dueDate: string;
-  subjectId: string;
-  subjectName: string;
-}
-
-export interface ProgressOverview {
-  studentId: string;
   name: string;
   grade: string;
   age: number;
-  enrolledSince: string;
+  subjects: Subject[];
+  progress: number;
+}
+
+// Activity for the progress overview
+export interface Activity {
+  type: string;
+  itemName: string;
+  subjectName: string;
+  timestamp: string;
+}
+
+// Assessment for the progress overview
+export interface Assessment {
+  id: string;
+  title: string;
+  subjectName: string;
+  dueDate: string;
+}
+
+// Progress overview data
+export interface ProgressOverview {
+  id: string;
+  name: string;
+  grade: string;
   overallProgress: number;
+  enrolledSince: string;
   subjects: Subject[];
   recentActivity: Activity[];
   upcomingAssessments: Assessment[];
 }
 
-// Subject progress types
-export interface Chapter {
-  id: string;
-  name: string;
-  progress: number;
-  assessmentScore: number | null;
-  status: "completed" | "in_progress" | "not_started";
-}
-
+// Subject progress data
 export interface SubjectProgress {
   subject: {
     id: string;
@@ -51,9 +55,8 @@ export interface SubjectProgress {
     description: string;
   };
   completionPercentage: number;
-  lastActivity: string;
-  chaptersCompleted: number;
   totalChapters: number;
+  chaptersCompleted: number;
   currentChapter: string;
   totalStudyTimeHours: number;
   averageAssessmentScore: number;
@@ -62,152 +65,91 @@ export interface SubjectProgress {
   areasForImprovement: string[];
 }
 
-// Progress statistics types
-export interface DailyStudy {
-  day: string;
-  hours: number;
-  target: number;
-}
-
-export interface WeeklyStudy {
-  week: string;
-  hours: number;
-  target: number;
-}
-
-export interface SubjectDistribution {
-  subject: string;
-  hours: number;
-  percentage: number;
-}
-
-export interface AssessmentTrend {
-  month: string;
-  score: number;
-}
-
-export interface SubjectPerformance {
-  subject: string;
-  averageScore: number;
-}
-
-export interface RecentAssessment {
-  id: string;
-  title: string;
-  score: number;
-  maxScore: number;
-  date: string;
-  status: string;
-}
-
-export interface ProgressStatistics {
-  studyTime: {
-    daily: {
-      data: DailyStudy[];
-      totalHours: number;
-      targetHours: number;
-      adherenceRate: number;
-    };
-    weekly: {
-      data: WeeklyStudy[];
-      totalHours: number;
-      targetHours: number;
-      adherenceRate: number;
-    };
-    subjectDistribution: SubjectDistribution[];
-  };
-  assessments: {
-    recent: RecentAssessment[];
-    trend: AssessmentTrend[];
-    subjectPerformance: SubjectPerformance[];
-  };
-}
-
-// Study analytics types
-export interface StudySession {
-  id: string;
-  subject: string;
-  startTime: string;
-  endTime: string;
-  durationMinutes: number;
-  chaptersStudied: string[];
-  completed: boolean;
-}
-
-export interface PeakStudyTime {
-  time: string;
-  percentage: number;
-}
-
-export interface ProductiveSubject {
-  subject: string;
-  averageSessionScore: number;
-  averageSessionLength: number;
-}
-
-export interface StudyAnalytics {
-  recentSessions: StudySession[];
-  weeklyStudyHours: number;
-  monthlyStudyHours: number;
-  peakStudyTimes: PeakStudyTime[];
-  productiveSubjects: ProductiveSubject[];
-  studyStreak: number;
-  longestStudyStreak: number;
-}
-
-// Assessment results types
-export interface CompletedAssessment {
-  id: string;
-  title: string;
-  type: string;
-  subject: string;
-  score: number;
-  maxScore: number;
-  completedOn: string;
-  timeSpentMinutes: number;
-  status: string;
-}
-
-export interface UpcomingAssessment {
-  id: string;
-  title: string;
-  type: string;
-  subject: string;
-  dueDate: string;
-  estimatedTimeMinutes: number;
-}
-
-export interface AssessmentStats {
-  completed: number;
-  passed: number;
-  failed: number;
-  averageScore: number;
-  averageTimeMinutes: number;
-}
-
-export interface SkillBreakdown {
-  skill: string;
-  score: number;
-  status: string;
-}
-
-export interface AssessmentResults {
-  completedAssessments: CompletedAssessment[];
-  upcomingAssessments: UpcomingAssessment[];
-  assessmentStats: AssessmentStats;
-  skillBreakdown: SkillBreakdown[];
-  assessments: {
-    trend: AssessmentTrend[];
-    subjectPerformance: SubjectPerformance[];
-  };
-}
-
-// Child type for the parent dashboard
-export interface Child {
+// Chapter in a subject
+export interface Chapter {
   id: string;
   name: string;
-  grade: string;
-  age: number;
-  subjects: Subject[];
   progress: number;
+  assessmentScore: number | null;
+  status: "completed" | "in_progress" | "not_started";
+}
+
+// Progress statistics
+export interface ProgressStatistics {
+  enrolledSubjects: number;
+  completedChapters: number;
+  totalChapters: number;
+  averageAssessmentScore: number;
+  studyTimeByDayOfWeek: {
+    day: string;
+    hours: number;
+  }[];
+  studyTimeBySubject: {
+    subject: string;
+    hours: number;
+  }[];
+  performanceBySkill: {
+    skill: string;
+    score: number;
+  }[];
+}
+
+// Study analytics data
+export interface StudyAnalytics {
+  daily: {
+    data: Array<{
+      day: string;
+      hours: number;
+      target: number;
+    }>;
+    totalHours: number;
+    targetHours: number;
+    adherenceRate: number;
+  };
+  weekly: {
+    data: Array<{
+      week: string;
+      hours: number;
+      target: number;
+    }>;
+    totalHours: number;
+    targetHours: number;
+    adherenceRate: number;
+  };
+  subjectDistribution: Array<{
+    subject: string;
+    hours: number;
+    percentage: number;
+  }>;
+  peakStudyTimes: Array<{
+    time: string;
+    percentage: number;
+  }>;
+}
+
+// Assessment results data
+export interface AssessmentResults {
+  completedAssessments: Array<{
+    id: string;
+    title: string;
+    type: string;
+    subject: string;
+    score: number;
+    maxScore: number;
+    completedOn: string;
+    status: string;
+  }>;
+  trends: Array<{
+    month: string;
+    score: number;
+  }>;
+  subjectPerformance: Array<{
+    subject: string;
+    averageScore: number;
+  }>;
+  skillBreakdown: Array<{
+    skill: string;
+    score: number;
+    status: string;
+  }>;
 }

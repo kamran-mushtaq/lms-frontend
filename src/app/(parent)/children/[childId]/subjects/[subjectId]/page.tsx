@@ -1,3 +1,4 @@
+// src/app/(parent)/children/[childId]/subjects/[subjectId]/page.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -9,9 +10,35 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
-import { useSubjectProgress } from "@/hooks/parent/use-subject-progress";
+import apiClient from "@/lib/api-client";
 import SubjectHeader from "./components/subject-header";
 import ChapterCompletion from "@/components/parent-dashboard/chapter-completion";
+import { useSubjectProgress } from "@/hooks/parent/use-subject-progress";
+
+interface Chapter {
+    id: string;
+    name: string;
+    progress: number;
+    assessmentScore: number | null;
+    status: "completed" | "in_progress" | "not_started";
+}
+
+interface SubjectProgress {
+    subject: {
+        id: string;
+        name: string;
+        description: string;
+    };
+    completionPercentage: number;
+    totalChapters: number;
+    chaptersCompleted: number;
+    currentChapter: string;
+    totalStudyTimeHours: number;
+    averageAssessmentScore: number;
+    chapters: Chapter[];
+    strengths: string[];
+    areasForImprovement: string[];
+}
 
 export default function SubjectDetailPage() {
     const params = useParams();
@@ -45,7 +72,7 @@ export default function SubjectDetailPage() {
         );
     }
 
-    if (!subjectProgress) {
+    if (isError || !subjectProgress) {
         return (
             <div className="flex flex-col items-center justify-center h-[500px]">
                 <Icons.warning className="h-10 w-10 text-muted-foreground mb-4" />

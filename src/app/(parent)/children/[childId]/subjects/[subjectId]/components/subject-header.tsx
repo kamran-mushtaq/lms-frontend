@@ -1,6 +1,20 @@
+// src/app/(parent)/children/[childId]/subjects/[subjectId]/components/subject-header.tsx
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { SubjectProgress } from "@/types/parent-dashboard";
+
+interface SubjectProgress {
+    subject: {
+        id: string;
+        name: string;
+        description: string;
+    };
+    completionPercentage: number;
+    totalChapters: number;
+    chaptersCompleted: number;
+    currentChapter: string;
+    totalStudyTimeHours: number;
+    averageAssessmentScore: number;
+}
 
 interface SubjectHeaderProps {
     data: SubjectProgress;
