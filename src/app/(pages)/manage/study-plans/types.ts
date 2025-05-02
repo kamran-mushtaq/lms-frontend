@@ -1,5 +1,6 @@
 // app/(pages)/manage/study-plans/types.ts
 export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Sunday, 6 = Saturday
+export type PlanType = 'balanced' | 'intensive' | 'relaxed' | 'custom';
 
 export interface Student {
   id: string;
@@ -47,6 +48,8 @@ export interface StudyPlanSchedule {
   effectiveFrom: string; // ISO date string
   effectiveUntil?: string; // ISO date string
   preferences?: Record<string, any>;
+  isDefaultPlan?: boolean;
+  planType?: 'balanced' | 'intensive' | 'relaxed' | 'custom';
 }
 
 export interface StudySession {

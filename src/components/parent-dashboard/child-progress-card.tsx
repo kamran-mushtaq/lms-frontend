@@ -1,110 +1,76 @@
-// components/parent-dashboard/child-progress-card.tsx
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
+import { format } from "date-fns";
+import { Check, Clock, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Eye, MessageSquare } from "lucide-react";
+import { Child, Subject } from "@/types/parent-dashboard";
 
 interface ChildProgressCardProps {
-  child: {
-    id: number;
-    name: string;
-    grade: string;
-    age?: number;
-    subjects: {
-      name: string;
-      progress: number;
-      lastActivity: string;
-    }[];
-  };
+  child: Child;
 }
 
 export default function ChildProgressCard({ child }: ChildProgressCardProps) {
-  const overallProgress =
-    child.subjects.reduce((acc, subject) => acc + subject.progress, 0) /
-    child.subjects.length;
+  const getStatusIcon = (progress: number) => {
+    if (progress >= 80) {
+      return <Check className="h-4 w-4 text-green-500" />;
+    } else if (progress >= 60) {
+      return <Clock className="h-4 w-4 text-yellow-500" />;
+    } else {
+      return <AlertCircle className="h-4 w-4 text-red-500" />;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return "Today";
+    } else if (diffDays === 1) {
+      return "Yesterday";
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else {
+      return format(date, "MMM d, yyyy");
+    }
+  };
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-center">
+    <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+      <CardHeader>
+        <div className="flex justify-between items-start">
           <div>
             <CardTitle>{child.name}</CardTitle>
             <CardDescription>
-              {child.grade}
-              {child.age ? ` • Age ${child.age}` : ""}
+              {child.grade} • Age {child.age}
             </CardDescription>
           </div>
-          <Badge className="font-medium">
-            {Math.round(overallProgress)}% Overall
-          </Badge>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {child.subjects.map((subject, index) => (
-            <div key={index} className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="font-medium">{subject.name}</span>
-                <span className="text-muted-foreground text-xs">
-                  Last activity: {subject.lastActivity}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-2 flex-1 bg-secondary/20 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${subject.progress}%`,
-                      backgroundColor: getSubjectColor(subject.name)
-                    }}
-                  />
+        {child.subjects && child.subjects.length > 0 ? (
+          <div className="space-y-4">
+            {child.subjects.map((subject, index) => (
+              <div key={index} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(subject.progress)}
+                  <span className="font-medium">{subject.name}</span>
                 </div>
-                <span className="text-sm font-medium w-12 text-right">
-                  {subject.progress}%
-                </span>
+                <div className="flex items-center gap-4">
+                  <Badge>{subject.progress}%</Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {formatDate(subject.lastActivity)}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
-
-          <div className="flex justify-between mt-6">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/parent/message/${child.id}`}>
-                <MessageSquare className="mr-2 h-4 w-4" /> Message Teacher
-              </Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link href={`/parent/children/${child.id}`}>
-                <Eye className="mr-2 h-4 w-4" /> View Details
-              </Link>
-            </Button>
+            ))}
           </div>
-        </div>
+        ) : (
+          <p className="text-muted-foreground text-center py-4">
+            No subject data available for this child
+          </p>
+        )}
       </CardContent>
     </Card>
   );
-}
-
-// Helper function to get color based on subject name
-function getSubjectColor(subjectName: string): string {
-  const subjectColors: Record<string, string> = {
-    Mathematics: "hsl(var(--subject-math))",
-    Math: "hsl(var(--subject-math))",
-    Science: "hsl(var(--subject-science))",
-    English: "hsl(var(--subject-language))",
-    Language: "hsl(var(--subject-language))",
-    History: "hsl(var(--subject-social))",
-    "Social Studies": "hsl(var(--subject-social))",
-    Art: "hsl(var(--subject-arts))",
-    "Physical Education": "hsl(var(--subject-pe))",
-    PE: "hsl(var(--subject-pe))"
-  };
-
-  return subjectColors[subjectName] || "hsl(var(--primary))";
 }

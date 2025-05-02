@@ -43,9 +43,11 @@ const APTITUDE_TEST_EXEMPT_PATHS = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  console.log(`[Middleware] Incoming request for path: ${pathname}`);
 
   // Check if the path is public
   if (publicPaths.some((path) => pathname.startsWith(path))) {
+    console.log(`[Middleware] Path ${pathname} is public. Allowing access.`);
     return NextResponse.next();
   }
 
@@ -71,10 +73,12 @@ export async function middleware(request: NextRequest) {
 
     const userType = user.type;
     const userId = user.id || user._id;
+    console.log(`[Middleware] Authenticated user: ${userId}, Type: ${userType}`);
 
     // Check if user is trying to access a role-specific area they don't have access to
+    // Corrected logic: Check if the pathname starts with the specific role's prefix
     const isAccessingAdminRoutes =
-      pathname.startsWith("/") && userType !== "admin";
+      pathname.startsWith("/admin") && userType !== "admin";
     const isAccessingTeacherRoutes =
       pathname.startsWith("/teacher") && userType !== "teacher";
     const isAccessingParentRoutes =

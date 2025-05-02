@@ -1,6 +1,6 @@
 // app/(pages)/manage/study-plans/schemas.ts
 import * as z from "zod";
-import { DayOfWeek } from "./types";
+import { DayOfWeek, PlanType } from "./types";
 
 // Helper to validate time string (HH:MM format)
 const timeStringSchema = z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, {
@@ -52,6 +52,8 @@ export const studyPlanScheduleSchema = z.object({
   effectiveFrom: z.string().min(1, "Start date is required"),
   effectiveUntil: z.string().optional(),
   preferences: z.record(z.any()).optional(),
+  isDefaultPlan: z.boolean().optional().default(false),
+  planType: z.enum(["balanced", "intensive", "relaxed", "custom"]).optional().default("custom"),
 });
 
 // Study session schema

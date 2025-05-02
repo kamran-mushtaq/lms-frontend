@@ -81,9 +81,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      setIsLoading(true);
      try {
        const token = localStorage.getItem("token") || getCookie("token");
+       console.log(`[AuthContext] Token found: ${!!token}`);
        if (!token) {
-         console.warn("No token found. Redirecting to login...");
+         console.warn("[AuthContext] No token found.");
          setUser(null);
+
+         // Define public paths (should match middleware)
+         const publicPaths = [
+           "/login",
+           "/signup",
+           "/register",
+           "/verify-otp",
+           "/reset-password",
+           "/forgot-password",
+           "/verify-email"
+         ];
+
+         // Check if the current path is protected
+         const isProtectedPath = !publicPaths.some((path) => pathname.startsWith(path));
+
+         if (isProtectedPath) {
+           console.warn(`[AuthContext] No token found on protected path '${pathname}'. Redirecting to login...`);
+           router.push("/login");
+         } else {
+            console.log(`[AuthContext] No token found on public path '${pathname}'. No redirect needed.`);
+         }
+
          return;
        }
 
@@ -231,6 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
       });
+      console.log('[AuthContext] Login API response:', response.data);
       const { access_token, user: userData,profile } = response.data;
 
       // Extract classId from the profile data
@@ -313,39 +337,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           break;
         case "student":
-          // --- NEW: Check status via backend API before redirect ---
-          let allRequiredTestsPassed = false; // Default to false (safer)
-          try {
-            console.log(`[AuthContext] Checking all required tests status via API for student ${userData._id}...`);
-            // Use the correct API URL and student ID
-            const checkUrl = `${API_URL}/enrollment/status/all-required-tests-passed/${userData._id}`;
-            // Make sure apiClient includes the auth header, or add it manually like below
-            const response = await apiClient.get(checkUrl, {
-              headers: { 'Authorization': `Bearer ${access_token}` } // Pass the token obtained during login
-            });
-            
-            // Check if the response has the expected boolean property
-            if (response.data && typeof response.data.allTestsPassed === 'boolean') {
-              allRequiredTestsPassed = response.data.allTestsPassed;
-              console.log(`[AuthContext] API check result: allTestsPassed=${allRequiredTestsPassed}`);
-            } else {
-               console.error(`[AuthContext] Invalid or missing 'allTestsPassed' property in API response:`, response.data);
-               // Keep allRequiredTestsPassed as false if response is invalid
-            }
-          } catch (apiError: any) {
-             console.error(`[AuthContext] Error calling all-required-tests-passed API:`, apiError.response?.data || apiError.message);
-             // Default to false (redirect to aptitude-test) on API error
-             allRequiredTestsPassed = false;
-          }
+          // TODO: Implement actual check for profile completion status based on backend response
+          // This should be fetched from the backend as part of the user data or a separate API call
+          // Assuming the profile object from the login response contains a key indicating completion
+          // Check for profile completion based on required fields in the profile data
+          const requiredProfileFields = [
+            'Birth Date',
+            'Gender',
+            'Address',
+            'City',
+            'Country',
+            'Phone',
+            'Father Name',
+            'Mother Name',
+          ];
 
-          // Set redirect path based on the API result
-          if (allRequiredTestsPassed) {
-            redirectPath = "/student/dashboard";
+          // Define required fields for profile completion based on sections
+          // Define required fields for profile completion based on sections (using assumed lowercase keys)
+          // NOTE: These keys are assumed based on the image and MongoDB convention.
+          // They might need adjustment if the actual keys in the backend profile data are different.
+          const requiredPersonalFields = [
+            'student_name',
+            'birth_date',
+            'gender',
+            'address',
+            'city',
+            'country',
+            'phone',
+          ];
+          const requiredContactFields = [
+            'father_name',
+            'father_cell_#', // Assuming this key format
+            'mother_name',
+            'mother_cell_#', // Assuming this key format
+          ];
+
+          const allRequiredFields = [...requiredPersonalFields, ...requiredContactFields];
+
+          const profileData = profile?.data || [];
+          const isProfileCompleted = allRequiredFields.every(field => {
+            const profileEntry = profileData.find((item: any) => item.key === field);
+            // Check if the key exists and the value is not null, undefined, or an empty string
+            return profileEntry && profileEntry.value !== null && profileEntry.value !== undefined && profileEntry.value !== '';
+          });
+
+          console.log(`[AuthContext] Student profile completed status: ${isProfileCompleted}`);
+
+          if (!isProfileCompleted) {
+            redirectPath = "/student/profile-completion";
+            console.log(`[AuthContext] Student profile not completed. Redirecting to: ${redirectPath}`);
           } else {
-            redirectPath = "/aptitude-test";
+            // Existing logic for aptitude test check
+            let allRequiredTestsPassed = false; // Default to false (safer)
+            try {
+              console.log(`[AuthContext] Checking all required tests status via API for student ${userData._id}...`);
+              // Use the correct API URL and student ID
+              const checkUrl = `${API_URL}/enrollment/status/all-required-tests-passed/${userData._id}`;
+              // Make sure apiClient includes the auth header, or add it manually like below
+              const response = await apiClient.get(checkUrl, {
+                headers: { 'Authorization': `Bearer ${access_token}` } // Pass the token obtained during login
+              });
+
+              // Check if the response has the expected boolean property
+              if (response.data && typeof response.data.allTestsPassed === 'boolean') {
+                allRequiredTestsPassed = response.data.allTestsPassed;
+                console.log(`[AuthContext] API check result: allTestsPassed=${allRequiredTestsPassed}`);
+              } else {
+                 console.error(`[AuthContext] Invalid or missing 'allTestsPassed' property in API response:`, response.data);
+                 // Keep allRequiredTestsPassed as false if response is invalid
+              }
+            } catch (apiError: any) {
+               console.error(`[AuthContext] Error calling all-required-tests-passed API:`, apiError.response?.data || apiError.message);
+               // Default to false (redirect to aptitude-test) on API error
+               allRequiredTestsPassed = false;
+            }
+
+            // Set redirect path based on the API result
+            if (allRequiredTestsPassed) {
+              redirectPath = "/student/dashboard";
+            } else {
+              redirectPath = "/aptitude-test";
+            }
+            console.log(`[AuthContext] Determined redirect path for student: ${redirectPath}`);
           }
-          console.log(`[AuthContext] Determined redirect path for student: ${redirectPath}`);
-          // --- END NEW LOGIC ---
           break;
         default:
           // Fallback to login page if type is unknown or invalid
@@ -353,6 +427,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           redirectPath = "/login";
           break;
       }
+
+      console.log(`[AuthContext] Final redirect path after login: ${redirectPath}`);
 
       // Use router.push for client-side navigation
       router.push(redirectPath);

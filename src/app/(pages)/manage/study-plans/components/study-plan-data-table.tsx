@@ -1,3 +1,4 @@
+// app/(pages)/manage/study-plans/components/study-plan-data-table.tsx
 "use client";
 
 import { useState } from "react";
@@ -12,7 +13,8 @@ import {
     Clock,
     User,
     Check,
-    X
+    X,
+    Sparkles
 } from "lucide-react";
 
 import {
@@ -45,7 +47,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { StudyPlanSchedule, Student } from "../types";
+import { StudyPlanSchedule, Student, PlanType } from "../types";
 
 interface StudyPlanDataTableProps {
     plans: StudyPlanSchedule[];
@@ -109,6 +111,20 @@ export function StudyPlanDataTable({
                 : (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0);
         }
 
+        if (sortColumn === "isDefaultPlan") {
+            return sortDirection === "asc"
+                ? (a.isDefaultPlan ? 1 : 0) - (b.isDefaultPlan ? 1 : 0)
+                : (b.isDefaultPlan ? 1 : 0) - (a.isDefaultPlan ? 1 : 0);
+        }
+
+        if (sortColumn === "planType") {
+            const planTypeA = a.planType || "custom";
+            const planTypeB = b.planType || "custom";
+            return sortDirection === "asc"
+                ? planTypeA.localeCompare(planTypeB)
+                : planTypeB.localeCompare(planTypeA);
+        }
+
         return 0;
     });
 
@@ -140,6 +156,40 @@ export function StudyPlanDataTable({
     // Get student name from ID
     const getStudentName = (studentId: string) => {
         return students.find(s => s.id === studentId)?.name || "Unknown Student";
+    };
+
+    // Get plan type display name
+    const getPlanTypeDisplayName = (planType?: PlanType) => {
+        if (!planType || planType === "custom") return "Custom";
+        return planType.charAt(0).toUpperCase() + planType.slice(1);
+    };
+
+    // Get plan type badge
+    const getPlanTypeBadge = (plan: StudyPlanSchedule) => {
+        if (!plan.isDefaultPlan) return null;
+
+        const planType = plan.planType || "custom";
+
+        let badgeClass = "";
+        switch (planType) {
+            case "balanced":
+                badgeClass = "bg-blue-50 text-blue-700 border-blue-200";
+                break;
+            case "intensive":
+                badgeClass = "bg-purple-50 text-purple-700 border-purple-200";
+                break;
+            case "relaxed":
+                badgeClass = "bg-green-50 text-green-700 border-green-200";
+                break;
+            default:
+                badgeClass = "bg-gray-50 text-gray-700 border-gray-200";
+        }
+
+        return (
+            <Badge variant="outline" className={badgeClass}>
+                <Sparkles className="mr-1 h-3 w-3" /> {getPlanTypeDisplayName(planType)}
+            </Badge>
+        );
     };
 
     // Render loading state
@@ -178,15 +228,15 @@ export function StudyPlanDataTable({
                                 <ArrowUpDown className="ml-2 h-4 w-4" />
                             </div>
                         </TableHead>
-                        <TableHead onClick={() => handleSort("effectiveFrom")} className="cursor-pointer">
+                        <TableHead onClick={() => handleSort("planType")} className="cursor-pointer">
                             <div className="flex items-center">
-                                Start Date
+                                Plan Type
                                 <ArrowUpDown className="ml-2 h-4 w-4" />
                             </div>
                         </TableHead>
-                        <TableHead onClick={() => handleSort("effectiveUntil")} className="cursor-pointer">
+                        <TableHead onClick={() => handleSort("effectiveFrom")} className="cursor-pointer">
                             <div className="flex items-center">
-                                End Date
+                                Start Date
                                 <ArrowUpDown className="ml-2 h-4 w-4" />
                             </div>
                         </TableHead>
@@ -229,20 +279,15 @@ export function StudyPlanDataTable({
                                     </div>
                                 </TableCell>
                                 <TableCell>
+                                    {getPlanTypeBadge(plan) || (
+                                        <span className="text-muted-foreground">Custom</span>
+                                    )}
+                                </TableCell>
+                                <TableCell>
                                     <div className="flex items-center">
                                         <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
                                         {format(new Date(plan.effectiveFrom), "MMM d, yyyy")}
                                     </div>
-                                </TableCell>
-                                <TableCell>
-                                    {plan.effectiveUntil ? (
-                                        <div className="flex items-center">
-                                            <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
-                                            {format(new Date(plan.effectiveUntil), "MMM d, yyyy")}
-                                        </div>
-                                    ) : (
-                                        <span className="text-muted-foreground">No end date</span>
-                                    )}
                                 </TableCell>
                                 <TableCell>
                                     {plan.isActive ? (

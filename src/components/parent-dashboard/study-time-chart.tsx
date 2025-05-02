@@ -1,193 +1,250 @@
-// components/parent-dashboard/study-time-chart.tsx
-"use client";
-
-import { useState, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  BarChart,
-  Bar
-} from "recharts";
+import  apiClient  from "@/lib/api-client";
+import { BarChart, LineChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { Icons } from "@/components/icons";
 
-export default function StudyTimeChart() {
-  const [childFilter, setChildFilter] = useState("all");
-  const [periodFilter, setPeriodFilter] = useState("week");
-  interface ChartData {
-    day: string;
-    John: number;
-    Emily: number;
-    total: number;
-  }
-  const [chartData, setChartData] = useState<ChartData[]>([]);
-  const [loading, setLoading] = useState(true);
+interface StudyTimeChartProps {
+  childId: string;
+}
+
+interface StudyTimeData {
+  daily: {
+    data: any[];
+    totalHours: number;
+    targetHours: number;
+    adherenceRate: number;
+  };
+  weekly: {
+    data: any[];
+    totalHours: number;
+    targetHours: number;
+    adherenceRate: number;
+  };
+  subjectDistribution: any[];
+}
+
+export default function StudyTimeChart({ childId }: StudyTimeChartProps) {
+  const [viewMode, setViewMode] = useState<"daily" | "weekly">("daily");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+  const [studyData, setStudyData] = useState<StudyTimeData>({
+    daily: {
+      data: [],
+      totalHours: 0,
+      targetHours: 0,
+      adherenceRate: 0
+    },
+    weekly: {
+      data: [],
+      totalHours: 0,
+      targetHours: 0,
+      adherenceRate: 0
+    },
+    subjectDistribution: []
+  });
+  const [peakTimes, setPeakTimes] = useState<any[]>([]);
+
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchStudyTime = async () => {
-      setLoading(true);
+    const fetchStudyData = async () => {
       try {
-        // Replace with actual API endpoint
-        // const response = await fetch(`/api/study-time?childId=${childFilter}&period=${periodFilter}`);
-        // if (!response.ok) throw new Error('Failed to fetch study time data');
-        // const data = await response.json();
+        setIsLoading(true);
+        // Fetch progress statistics
+        const studyResponse = await apiClient.get(`/student-progress/${childId}/statistics`);
 
-        // Mock data - replace with actual API response
-        const mockData = [
-          { day: "Mon", John: 2.5, Emily: 1.8, total: 4.3 },
-          { day: "Tue", John: 1.8, Emily: 2.2, total: 4.0 },
-          { day: "Wed", John: 3.2, Emily: 2.5, total: 5.7 },
-          { day: "Thu", John: 2.0, Emily: 3.0, total: 5.0 },
-          { day: "Fri", John: 2.8, Emily: 2.1, total: 4.9 },
-          { day: "Sat", John: 1.5, Emily: 1.2, total: 2.7 },
-          { day: "Sun", John: 0.8, Emily: 0.5, total: 1.3 }
-        ];
+        if (studyResponse.data && studyResponse.data.studyTime) {
+          setStudyData(studyResponse.data.studyTime);
+        }
 
-        setChartData(mockData);
+        // Fetch peak study times
+        const analyticsResponse = await apiClient.get(`/study-sessions/${childId}/analytics`);
+
+        if (analyticsResponse.data && analyticsResponse.data.peakStudyTimes) {
+          setPeakTimes(analyticsResponse.data.peakStudyTimes);
+        }
       } catch (error) {
+        console.error(error);
+        setIsError(true);
         toast({
           title: "Error",
           description: "Failed to load study time data. Please try again.",
           variant: "destructive"
         });
-        console.error(error);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
-    fetchStudyTime();
-  }, [childFilter, periodFilter, toast]);
+    if (childId) {
+      fetchStudyData();
+    }
+  }, [childId, toast]);
 
-  // Mock subject data - replace with actual data
-  const subjectData = [
-    { subject: "Math", hours: 8.5, percentage: 28 },
-    { subject: "Science", hours: 7.2, percentage: 24 },
-    { subject: "English", hours: 6.4, percentage: 21 },
-    { subject: "History", hours: 4.8, percentage: 16 },
-    { subject: "Art", hours: 3.2, percentage: 11 }
-  ];
+  const COLORS = ["#3b82f6", "#8b5cf6", "#ec4899", "#f97316"];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-[400px] w-full" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="h-[200px] w-full" />
+          <Skeleton className="h-[200px] w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isError ||
+    (studyData.daily.data.length === 0 &&
+      studyData.weekly.data.length === 0 &&
+      studyData.subjectDistribution.length === 0)) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[300px] border rounded-lg p-6">
+        <Icons.warning className="h-10 w-10 text-muted-foreground mb-4" />
+        <h3 className="text-xl font-medium mb-2">No Study Data Available</h3>
+        <p className="text-muted-foreground text-center max-w-md">
+          We couldn't find any study time data for this child. This could be because they haven't logged any study sessions yet.
+        </p>
+      </div>
+    );
+  }
+
+  const chartData = viewMode === "daily"
+    ? studyData.daily.data
+    : studyData.weekly.data;
 
   return (
-    <Card className="col-span-2">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div>
-          <CardTitle>Study Time</CardTitle>
-          <CardDescription>
-            Study time distribution across subjects and days
-          </CardDescription>
-        </div>
-        <div className="flex gap-2">
-          <Select value={childFilter} onValueChange={setChildFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Select Child" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Children</SelectItem>
-              <SelectItem value="1">John Smith</SelectItem>
-              <SelectItem value="2">Emily Johnson</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={periodFilter} onValueChange={setPeriodFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Select Period" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="time">
-          <TabsList className="mb-4">
-            <TabsTrigger value="time">Time Distribution</TabsTrigger>
-            <TabsTrigger value="subjects">By Subject</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="time" className="space-y-4">
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={chartData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis
-                    label={{
-                      value: "Hours",
-                      angle: -90,
-                      position: "insideLeft"
-                    }}
-                  />
-                  <Tooltip
-                    formatter={(value) => [`${value} hours`, ""]}
-                    labelFormatter={(label) => `${label}`}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="John" stroke="#8884d8" />
-                  <Line type="monotone" dataKey="Emily" stroke="#82ca9d" />
-                  {childFilter === "all" && (
-                    <Line type="monotone" dataKey="total" stroke="#ff7300" />
-                  )}
-                </LineChart>
-              </ResponsiveContainer>
+    <div className="space-y-6">
+      {chartData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Study Time</CardTitle>
+                <CardDescription>Hours spent studying over time</CardDescription>
+              </div>
+              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "daily" | "weekly")}>
+                <TabsList>
+                  <TabsTrigger value="daily">Daily</TabsTrigger>
+                  <TabsTrigger value="weekly">Weekly</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
-          </TabsContent>
-
-          <TabsContent value="subjects">
+          </CardHeader>
+          <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={subjectData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
+                <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="subject" />
-                  <YAxis
-                    label={{
-                      value: "Hours",
-                      angle: -90,
-                      position: "insideLeft"
-                    }}
+                  <XAxis
+                    dataKey={viewMode === "daily" ? "day" : "week"}
                   />
+                  <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
                   <Tooltip
-                    formatter={(value) => [`${value} hours`, ""]}
-                    labelFormatter={(label) => `${label}`}
+                    formatter={(value) => [`${value} hours`, 'Study time']}
                   />
                   <Legend />
-                  <Bar dataKey="hours" fill="#8884d8" />
+                  <Bar dataKey="hours" fill="#3b82f6" name="Actual" />
+                  <Bar dataKey="target" fill="#8b5cf6" name="Target" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {studyData.subjectDistribution.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Subject Distribution</CardTitle>
+              <CardDescription>Study time by subject</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={studyData.subjectDistribution}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ subject, percentage }) =>
+                        `${subject}: ${(percentage).toFixed(0)}%`
+                      }
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="hours"
+                      nameKey="subject"
+                    >
+                      {studyData.subjectDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value} hours`, 'Study time']} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {peakTimes.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Peak Study Times</CardTitle>
+              <CardDescription>Most productive hours</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={peakTimes}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis label={{ value: 'Percentage', angle: -90, position: 'insideLeft' }} />
+                    <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
+                    <Bar dataKey="percentage" fill="#ec4899" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {(studyData.daily.totalHours > 0 || studyData.weekly.totalHours > 0) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>Study Statistics</CardTitle>
+            <CardDescription>Study metrics and achievements</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-4">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Weekly Study Time</p>
+                <p className="text-2xl font-bold">{studyData.daily.totalHours.toFixed(1)} hours</p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Monthly Study Time</p>
+                <p className="text-2xl font-bold">{studyData.weekly.totalHours.toFixed(1)} hours</p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Weekly Target</p>
+                <p className="text-2xl font-bold">{studyData.daily.targetHours.toFixed(1)} hours</p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Adherence Rate</p>
+                <p className="text-2xl font-bold">{studyData.daily.adherenceRate.toFixed(0)}%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

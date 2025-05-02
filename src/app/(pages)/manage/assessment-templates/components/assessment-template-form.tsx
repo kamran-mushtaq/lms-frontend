@@ -593,7 +593,7 @@ export function AssessmentTemplateForm({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent className="w-full sm:w-1/2 lg:w-1/2 xl:w-1/2 h-screen overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>
             {template

@@ -1,120 +1,148 @@
-// components/parent-dashboard/children-overview.tsx
-"use client";
-
-import Link from "next/link";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, User, ArrowRight } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Child } from "@/types/parent-dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Check, Clock, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ChildrenOverviewProps {
-  children: any[];
+  children: Child[];
   loading: boolean;
+  onChildSelect: (childId: string) => void;
+  selectedChildId: string | null;
 }
 
 export default function ChildrenOverview({
   children,
-  loading
+  loading,
+  onChildSelect,
+  selectedChildId
 }: ChildrenOverviewProps) {
-  // Mock data - replace with actual API data
-  const mockChildren = [
-    { id: 1, name: "John Smith", grade: "Grade 6", subjects: 5, progress: 78 },
-    {
-      id: 2,
-      name: "Emily Johnson",
-      grade: "Grade 4",
-      subjects: 4,
-      progress: 85
+  const getStatusIcon = (progress: number) => {
+    if (progress >= 80) {
+      return <Check className="h-4 w-4 text-green-500" />;
+    } else if (progress >= 60) {
+      return <Clock className="h-4 w-4 text-yellow-500" />;
+    } else {
+      return <AlertCircle className="h-4 w-4 text-red-500" />;
     }
-  ];
+  };
 
-  const displayChildren = children.length > 0 ? children : mockChildren;
+  const getStatusColor = (progress: number) => {
+    if (progress >= 80) {
+      return "bg-green-500";
+    } else if (progress >= 60) {
+      return "bg-yellow-500";
+    } else {
+      return "bg-red-500";
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="overflow-hidden">
+            <CardContent className="p-0">
+              <div className="p-4">
+                <div className="flex items-center gap-4 mb-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                </div>
+                <Skeleton className="h-2 w-full mb-4" />
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (children.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center">
+          <h3 className="text-lg font-medium mb-2">No Children Added</h3>
+          <p className="text-muted-foreground">
+            You haven't added any children to your account yet. Add a child to start tracking their academic progress.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {loading ? (
-        // Loading skeletons
-        Array(3)
-          .fill(0)
-          .map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-5 w-24 mb-1" />
-                <Skeleton className="h-4 w-16" />
-              </CardHeader>
-              <CardContent>
-                <div className="mt-2 space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {children.map((child) => (
+        <Card
+          key={child.id}
+          className={cn(
+            "overflow-hidden cursor-pointer transition-colors",
+            selectedChildId === child.id ? "border-primary ring-1 ring-primary" : "hover:bg-muted/50"
+          )}
+          onClick={() => onChildSelect(child.id)}
+        >
+          <CardContent className="p-0">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="font-medium">{child.name}</div>
+                  <Badge variant="outline">{child.grade}</Badge>
                 </div>
-              </CardContent>
-            </Card>
-          ))
-      ) : (
-        <>
-          {displayChildren.map((child) => (
-            <Card key={child.id}>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between">
-                  <div>
-                    <CardTitle>{child.name}</CardTitle>
-                    <CardDescription>{child.grade}</CardDescription>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="bg-primary/10 text-primary"
-                  >
-                    {child.progress}%
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="mt-2 space-y-2">
-                  <div className="text-sm flex justify-between">
-                    <span>Active Subjects</span>
-                    <span className="font-medium">{child.subjects}</span>
-                  </div>
-                  <div className="h-2 bg-secondary/20 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all"
-                      style={{ width: `${child.progress}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-end">
-                    <Button variant="ghost" size="sm" asChild className="gap-1">
-                      <Link href={`/parent/children/${child.id}`}>
-                        View Details
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                <Badge className={getStatusColor(child.progress)}>
+                  {child.progress}%
+                </Badge>
+              </div>
 
-          <Card className="flex flex-col justify-center items-center p-6">
-            <User className="h-10 w-10 text-muted-foreground mb-2" />
-            <h3 className="font-medium mb-1">Add New Child</h3>
-            <p className="text-sm text-muted-foreground text-center mb-4">
-              Add another child to manage their learning
-            </p>
-            <Button asChild>
-              <Link href="/add-student">
-                <Plus className="mr-2 h-4 w-4" /> Add Child
-              </Link>
-            </Button>
-          </Card>
-        </>
-      )}
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">Overall Progress</span>
+                  <span>{child.progress}%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn("h-full rounded-full", getStatusColor(child.progress))}
+                    style={{ width: `${child.progress}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Subjects: <span className="font-medium">{child.subjects.length}</span>
+                </span>
+                <span className="text-muted-foreground">
+                  Age: <span className="font-medium">{child.age}</span>
+                </span>
+              </div>
+            </div>
+
+            {child.subjects.length > 0 && (
+              <div className="border-t px-4 py-3 bg-muted/30">
+                <p className="text-xs font-medium mb-2">Recent Subjects</p>
+                <div className="space-y-2">
+                  {child.subjects.slice(0, 2).map((subject) => (
+                    <div key={subject.id} className="flex justify-between items-center text-xs">
+                      <div className="flex items-center gap-1">
+                        {getStatusIcon(subject.progress)}
+                        <span>{subject.name}</span>
+                      </div>
+                      <span>{subject.progress}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

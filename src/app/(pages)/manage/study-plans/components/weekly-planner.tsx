@@ -1,16 +1,18 @@
+// app/(pages)/manage/study-plans/components/weekly-planner.tsx
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { StudyPlanSchedule, Subject, TimeSlot } from "../types";
+import { StudyPlanSchedule, Subject, TimeSlot, PlanType } from "../types";
 import {
     Clock,
     PlusCircle,
     Edit,
     X,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Sparkles
 } from "lucide-react";
 import {
     Dialog,
@@ -21,6 +23,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Day headers
 const days = [
@@ -111,11 +114,58 @@ export function WeeklyPlanner({
         setSelectedPlan(plan);
     };
 
+    // Get plan type badge
+    const getPlanTypeBadge = (plan: StudyPlanSchedule) => {
+        if (!plan.isDefaultPlan) return null;
+
+        const planType = plan.planType || "custom";
+
+        let badgeClass = "";
+        let tooltipText = "";
+
+        switch (planType) {
+            case "balanced":
+                badgeClass = "bg-blue-50 text-blue-700 border-blue-200";
+                tooltipText = "A balanced study plan with moderate time commitment";
+                break;
+            case "intensive":
+                badgeClass = "bg-purple-50 text-purple-700 border-purple-200";
+                tooltipText = "An intensive study plan with more frequent sessions";
+                break;
+            case "relaxed":
+                badgeClass = "bg-green-50 text-green-700 border-green-200";
+                tooltipText = "A lighter study plan with fewer sessions";
+                break;
+            default:
+                badgeClass = "bg-gray-50 text-gray-700 border-gray-200";
+                tooltipText = "A custom study plan";
+        }
+
+        return (
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Badge variant="outline" className={badgeClass}>
+                            <Sparkles className="mr-1 h-3 w-3" />
+                            {planType.charAt(0).toUpperCase() + planType.slice(1)} Plan
+                        </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>{tooltipText}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        );
+    };
+
     return (
         <Card className="w-full">
             <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <CardTitle>Weekly Study Plan</CardTitle>
+                    <div>
+                        <CardTitle>Weekly Study Plan</CardTitle>
+                        <CardDescription>View and manage your student's weekly schedule</CardDescription>
+                    </div>
                     <div className="flex items-center gap-2">
                         {studyPlans.length > 0 ? (
                             <Dialog>
@@ -137,8 +187,8 @@ export function WeeklyPlanner({
                                             <div
                                                 key={plan.id}
                                                 className={`p-3 border rounded-md cursor-pointer transition-colors ${selectedPlan?.id === plan.id
-                                                        ? "border-primary bg-primary-foreground"
-                                                        : "hover:bg-accent"
+                                                    ? "border-primary bg-primary-foreground"
+                                                    : "hover:bg-accent"
                                                     }`}
                                                 onClick={() => handleSelectPlan(plan)}
                                             >
@@ -146,9 +196,12 @@ export function WeeklyPlanner({
                                                     <div className="font-medium">
                                                         Plan from {new Date(plan.effectiveFrom).toLocaleDateString()}
                                                     </div>
-                                                    {plan.isActive && (
-                                                        <Badge variant="outline" className="bg-green-50 text-green-700">Active</Badge>
-                                                    )}
+                                                    <div className="flex items-center gap-2">
+                                                        {plan.isActive && (
+                                                            <Badge variant="outline" className="bg-green-50 text-green-700">Active</Badge>
+                                                        )}
+                                                        {getPlanTypeBadge(plan)}
+                                                    </div>
                                                 </div>
                                                 <div className="text-sm text-muted-foreground mt-1">
                                                     {plan.weeklySchedule.length} time slots
@@ -172,10 +225,22 @@ export function WeeklyPlanner({
                     <>
                         <div className="flex justify-between items-center mb-4">
                             <div>
-                                <span className="font-medium">Current Plan:</span> From {new Date(selectedPlan.effectiveFrom).toLocaleDateString()}
-                                {selectedPlan.effectiveUntil ? ` to ${new Date(selectedPlan.effectiveUntil).toLocaleDateString()}` : ""}
-                                {selectedPlan.isActive && (
-                                    <Badge variant="outline" className="ml-2 bg-green-50 text-green-700">Active</Badge>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-medium">Current Plan:</span> From {new Date(selectedPlan.effectiveFrom).toLocaleDateString()}
+                                    {selectedPlan.effectiveUntil ? ` to ${new Date(selectedPlan.effectiveUntil).toLocaleDateString()}` : ""}
+
+                                    <div className="flex items-center gap-2">
+                                        {selectedPlan.isActive && (
+                                            <Badge variant="outline" className="bg-green-50 text-green-700">Active</Badge>
+                                        )}
+                                        {getPlanTypeBadge(selectedPlan)}
+                                    </div>
+                                </div>
+
+                                {selectedPlan.isDefaultPlan && (
+                                    <p className="text-sm text-muted-foreground">
+                                        This is a recommended study plan that has been optimized for this student
+                                    </p>
                                 )}
                             </div>
                             <Button variant="outline" size="sm" onClick={() => onEditPlan(selectedPlan)}>
@@ -259,10 +324,15 @@ export function WeeklyPlanner({
                                 ? "Please select a study plan to view or create a new one"
                                 : "No study plans available. Create your first study plan to get started"}
                         </div>
-                        <Button onClick={onCreatePlan}>
-                            <PlusCircle className="h-4 w-4 mr-1" />
-                            Create Study Plan
-                        </Button>
+                        <div className="space-y-3">
+                            <Button onClick={onCreatePlan}>
+                                <Sparkles className="h-4 w-4 mr-1" />
+                                Create Recommended Plan
+                            </Button>
+                            <div className="text-sm text-gray-400">
+                                Quick start with a plan based on the student's subjects
+                            </div>
+                        </div>
                     </div>
                 )}
             </CardContent>
