@@ -49,6 +49,7 @@ const profileSchema = z.object({
     gradePolicy: z.string().optional(),
     status: z.string().optional(),
     specialization: z.string().optional(),
+    photoUrl: z.string().optional(),
 });
 
 export default function StudentProfilePage() {
@@ -113,7 +114,9 @@ export default function StudentProfilePage() {
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setPhotoFile(e.target.files[0]);
+            const file = e.target.files[0];
+            setPhotoFile(file);
+            form.setValue("photoUrl", file ? file.name : "", { shouldValidate: true, shouldDirty: true });
         }
     };
 
@@ -126,16 +129,52 @@ export default function StudentProfilePage() {
             // Create form data for file upload if a new photo is selected
             if (photoFile) {
                 const fileData = new FormData();
-                fileData.append("photo", photoFile);
+                fileData.append("file", photoFile);
+                console.log("Uploading photo:", photoFile);
+                
 
-                // Upload photo logic would go here
-                // const photoUrl = await uploadPhoto(fileData);
-                // data.photoUrl = photoUrl;
+                // Upload photo logic
+                try {
+                    const token = localStorage.getItem("token");
+
+                    // const response = await apiClient.post('/api/upload', formData, {
+                    //     headers: {
+                    //         'Content-Type': 'multipart/form-data'
+                    //     }
+                    // });
+                    const response = await fetch("https://phpstack-732216-5200333.cloudwaysapps.com/api/upload", {
+                        method: "POST",
+                        body: fileData,
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to upload photo: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    console.log("Photo uploaded successfully:", result);
+
+                    // Assuming the API returns the photo URL in the 'path' field
+                    const photoUrl = result.path;
+                    data.photoUrl = photoUrl;
+                } catch (uploadError: any) {
+                    console.error("Error uploading photo:", uploadError);
+                    toast({
+                        title: "Error",
+                        description: uploadError.message || "Failed to upload photo. Please try again.",
+                        variant: "destructive",
+                    });
+                    setIsSubmitting(false);
+                    return; // Exit the function to prevent profile update
+                }
             }
 
-            // Only include fields that have been changed
+            // Include photoUrl even if it's not a dirty field, as it's handled separately
             const changedData = Object.keys(data).reduce((acc, key) => {
-                if (form.formState.dirtyFields[key as keyof typeof data]) {
+                if (form.formState.dirtyFields[key as keyof typeof data] || key === "photoUrl") {
                     acc[key as keyof typeof data] = data[key as keyof typeof data];
                 }
                 return acc;
