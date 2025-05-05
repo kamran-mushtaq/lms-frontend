@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/api-client';
 import { toast } from 'sonner';
 import { createContext } from 'react';
+import { AuthContextType, AuthContext } from '@/contexts/AuthContext';
 
 // User interface
 export interface User {
@@ -16,16 +17,6 @@ export interface User {
   isVerified: boolean;
 }
 
-// Authentication context interface
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;  
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  verifyOtp: (userId: string, otp: string) => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<void>;
-  resetPassword: (token: string, newPassword: string) => Promise<void>;
-}
 
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

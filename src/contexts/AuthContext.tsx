@@ -28,7 +28,7 @@ type User = {
 };
 
 
-type AuthContextType = {
+export type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
@@ -66,7 +66,7 @@ type StudentRegistrationData = {
   classId: string;
 };
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -384,7 +384,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log(`[AuthContext] Student profile completed status: ${isProfileCompleted}`);
 
           if (!isProfileCompleted) {
-            redirectPath = "/student/profile-completion";
+            redirectPath = "/(student)/profile";
             console.log(`[AuthContext] Student profile not completed. Redirecting to: ${redirectPath}`);
           } else {
             // Existing logic for aptitude test check
