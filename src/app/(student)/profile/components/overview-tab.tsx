@@ -1,238 +1,213 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+// src/app/(student)/profile/components/overview-tab.tsx
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { StudentProfile } from "../types";
-import { CalendarClock, Edit, Save, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { StudentProfile } from "../types";
+import { CalendarClock, GraduationCap, BookText, Calendar, Award, CheckCircle2 } from "lucide-react";
+import { UseFormReturn } from "react-hook-form";
 
 interface OverviewTabProps {
     profile: StudentProfile | null;
     isEditing: boolean;
-    onUpdate: (data: Partial<StudentProfile>) => void;
+    form: UseFormReturn<any>;
 }
 
-export default function OverviewTab({ profile, isEditing, onUpdate }: OverviewTabProps) {
-    const [formData, setFormData] = useState({
-        regNumber: profile?.regNumber || "",
-        batch: profile?.batch || "",
-        currentSemester: profile?.currentSemester || "",
-        degreeTitle: profile?.degreeTitle || "",
-        admissionDate: profile?.admissionDate || "",
-        gradePolicy: profile?.gradePolicy || "",
-        status: profile?.status || "Active"
-    });
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleSelectChange = (name: string, value: string) => {
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleSave = () => {
-        onUpdate(formData);
-    };
-
+export default function OverviewTab({ profile, isEditing, form }: OverviewTabProps) {
     if (!profile) return null;
 
     return (
-        <div className="space-y-6">
-            {/* Main Information Card */}
-            <Card>
-                <CardHeader className="pb-2 flex flex-row items-start justify-between">
-                    <div>
-                        <CardTitle>Student Information</CardTitle>
-                        <CardDescription>Personal details and student status</CardDescription>
-                    </div>
-                    {isEditing && (
-                        <Button size="sm" onClick={handleSave}>
-                            <Save className="h-4 w-4 mr-2" />
-                            Save
-                        </Button>
-                    )}
+        <div className="space-y-8">
+            {/* Academic Summary Card */}
+            <Card className="shadow-sm">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <GraduationCap className="h-5 w-5 text-primary" />
+                        Academic Summary
+                    </CardTitle>
+                    <CardDescription>
+                        Overview of your academic status and enrollment details
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                            <div>
-                                {isEditing ? (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="regNumber">Registration Number</Label>
-                                        <Input
-                                            id="regNumber"
-                                            name="regNumber"
-                                            value={formData.regNumber}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                ) : (
-                                    <>
-                                        <h3 className="text-sm font-medium text-muted-foreground">Registration Number</h3>
-                                        <p className="font-medium">{profile.regNumber || "N/A"}</p>
-                                    </>
-                                )}
+                    {isEditing ? (
+                        <Form {...form}>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FormField
+                                    control={form.control}
+                                    name="batch"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Batch</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} placeholder="Batch" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="currentSemester"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Current Semester</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} placeholder="Current Semester" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="degreeTitle"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Degree Title</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} placeholder="Degree Title" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="admissionDate"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Admission Date</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} placeholder="Admission Date" type="date" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="gradePolicy"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Grade Policy</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} placeholder="Grade Policy" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="status"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Student Status</FormLabel>
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                defaultValue={field.value}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select status" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="Active">Active</SelectItem>
+                                                    <SelectItem value="On Leave">On Leave</SelectItem>
+                                                    <SelectItem value="Graduated">Graduated</SelectItem>
+                                                    <SelectItem value="Suspended">Suspended</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                        </Form>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">Batch</p>
+                                <p className="font-medium">{profile.batch || "N/A"}</p>
                             </div>
 
-                            <div>
-                                {isEditing ? (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="batch">Batch</Label>
-                                        <Input
-                                            id="batch"
-                                            name="batch"
-                                            value={formData.batch}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                ) : (
-                                    <>
-                                        <h3 className="text-sm font-medium text-muted-foreground">Batch</h3>
-                                        <p className="font-medium">{profile.batch || "N/A"}</p>
-                                    </>
-                                )}
+                            <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">Current Semester</p>
+                                <p className="font-medium">{profile.currentSemester || "N/A"}</p>
                             </div>
 
-                            <div>
-                                {isEditing ? (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="currentSemester">Current Semester</Label>
-                                        <Input
-                                            id="currentSemester"
-                                            name="currentSemester"
-                                            value={formData.currentSemester}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                ) : (
-                                    <>
-                                        <h3 className="text-sm font-medium text-muted-foreground">Current Semester</h3>
-                                        <p className="font-medium">{profile.currentSemester || "N/A"}</p>
-                                    </>
-                                )}
+                            <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">Degree Title</p>
+                                <p className="font-medium">{profile.degreeTitle || "N/A"}</p>
                             </div>
 
-                            <div>
-                                {isEditing ? (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="degreeTitle">Degree Title</Label>
-                                        <Input
-                                            id="degreeTitle"
-                                            name="degreeTitle"
-                                            value={formData.degreeTitle}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                ) : (
-                                    <>
-                                        <h3 className="text-sm font-medium text-muted-foreground">Degree Title</h3>
-                                        <p className="font-medium">{profile.degreeTitle || "N/A"}</p>
-                                    </>
-                                )}
+                            <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">Admission Date</p>
+                                <p className="font-medium">{profile.admissionDate || "N/A"}</p>
+                            </div>
+
+                            <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">Grade Policy</p>
+                                <p className="font-medium">{profile.gradePolicy || "N/A"}</p>
+                            </div>
+
+                            <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">Student Status</p>
+                                <Badge variant={profile.status === "Active" ? "success" : "secondary"}>
+                                    {profile.status || "N/A"}
+                                </Badge>
                             </div>
                         </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                {isEditing ? (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="admissionDate">Admission Date</Label>
-                                        <Input
-                                            id="admissionDate"
-                                            name="admissionDate"
-                                            type="date"
-                                            value={formData.admissionDate}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                ) : (
-                                    <>
-                                        <h3 className="text-sm font-medium text-muted-foreground">Admission Date</h3>
-                                        <p className="font-medium">{profile.admissionDate || "N/A"}</p>
-                                    </>
-                                )}
-                            </div>
-
-                            <div>
-                                {isEditing ? (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="gradePolicy">Grade Policy</Label>
-                                        <Input
-                                            id="gradePolicy"
-                                            name="gradePolicy"
-                                            value={formData.gradePolicy}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                ) : (
-                                    <>
-                                        <h3 className="text-sm font-medium text-muted-foreground">Grade Policy</h3>
-                                        <p className="font-medium">{profile.gradePolicy || "N/A"}</p>
-                                    </>
-                                )}
-                            </div>
-
-                            <div>
-                                {isEditing ? (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="status">Student Status</Label>
-                                        <Select
-                                            value={formData.status}
-                                            onValueChange={(value) => handleSelectChange("status", value)}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select status" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Active">Active</SelectItem>
-                                                <SelectItem value="On Leave">On Leave</SelectItem>
-                                                <SelectItem value="Graduated">Graduated</SelectItem>
-                                                <SelectItem value="Suspended">Suspended</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <h3 className="text-sm font-medium text-muted-foreground">Student Status</h3>
-                                        <Badge variant={profile.status === "Active" ? "success" : "secondary"}>
-                                            {profile.status || "N/A"}
-                                        </Badge>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    )}
                 </CardContent>
             </Card>
 
-            {/* Activity Section */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Recent Activity</CardTitle>
-                    <CardDescription>Latest updates to your student record</CardDescription>
+            {/* Recent Activity Card */}
+            <Card className="shadow-sm">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <CalendarClock className="h-5 w-5 text-primary" />
+                        Recent Activity
+                    </CardTitle>
+                    <CardDescription>
+                        Latest updates to your student record
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         {profile.activities?.map((activity, index) => (
-                            <div key={index} className="flex items-start">
-                                <div className="mr-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                            <div key={index} className="flex items-start gap-4">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                     <CalendarClock className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
-                                    <div className="font-medium">{activity.title}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                        {activity.description} • {activity.date}
-                                    </div>
+                                    <h4 className="text-base font-medium">{activity.title}</h4>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {activity.description}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        {activity.date}
+                                    </p>
                                 </div>
                             </div>
                         ))}
 
                         {(!profile.activities || profile.activities.length === 0) && (
-                            <p className="text-muted-foreground text-center py-4">No recent activity to display</p>
+                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                                <CalendarClock className="h-10 w-10 text-muted-foreground mb-2" />
+                                <h4 className="text-base font-medium text-muted-foreground">No recent activity</h4>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    When there are updates to your student record, they will appear here.
+                                </p>
+                            </div>
                         )}
                     </div>
                 </CardContent>
