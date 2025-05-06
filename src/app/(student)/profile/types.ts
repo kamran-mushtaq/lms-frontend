@@ -1,5 +1,5 @@
 // src/app/(student)/profile/types.ts
-// Complete type definitions for student profile
+// Updated type definitions for student profile based on requirements
 
 // Define the academic entry type
 export interface AcademicEntry {
@@ -11,6 +11,7 @@ export interface AcademicEntry {
   year: string;
 }
 
+// Define the guardian type
 export interface Guardian {
   name: string;
   relation: string;
@@ -25,159 +26,147 @@ export interface Guardian {
   monthlyIncome?: string;
   vaccinated?: boolean;
   taxFiler?: boolean;
+  itsNumber?: string; // For Father/Mother ITS
+}
+
+// Define the sibling type
+export interface Sibling {
+  name: string;
+  gender: string;
+  birthDate: string;
+  schoolName?: string;
+}
+
+// Define the contact person type
+export interface ContactPerson {
+  name: string;
+  cellNo: string;
+  email?: string;
+  designation?: string;
+  company?: string;
+  relation: string;
+  monthlyIncome?: string;
+}
+
+// Define the referral type
+export interface Referral {
+  name: string;
+  mobileNumber: string;
+  relation: string;
 }
 
 // Define the custom detail entry type
 export interface CustomDetailEntry {
   type: string;
   description: string;
+  reference?: string;
 }
 
-// Define types for form values
-export interface PersonalDetailsFormValues {
-  nationality?: string;
-  religion?: string;
-  firstLanguage?: string;
-  bloodGroup?: string;
-  height?: string;
-  weight?: string;
-  maritalStatus?: string;
-  transcriptFootNote?: string;
-}
-
-// Updated StudentProfile type with all fields
+// Updated StudentProfile type with all fields based on requirements
 export interface StudentProfile {
-  // General Info
-  regNumber: string;
+  // Student Information
   name: string;
-  oldGr?: string;
-  photoUrl?: string;
-
-  // GitHub Integration
-  githubUsername?: string;
-  githubAvatarUrl?: string;
-
-  // Contact Info
-  address1: string;
-  address2?: string;
-  landMarks?: string;
-  area?: string;
-  phone: string;
-  cell?: string;
-  country: string;
-  city: string;
-  smsMobile1?: string;
-  smsMobile2?: string;
-  personalEmail?: string;
-  email: string;
-
-  // Personal Info
-  birthPlace?: string;
+  sfNumber?: string;
+  bFormNumber?: string;
   birthDate: string;
   gender: string;
-  cnicNumber: string;
-  nationality?: string;
+  address1: string;
+  address2?: string;
+  city: string;
+  country: string;
+  phone: string;
+  email: string;
   religion?: string;
-  firstLanguage?: string;
+  motherTongue?: string;
+  castCommunity?: string;
+  nationality?: string;
   bloodGroup?: string;
   height?: string;
   weight?: string;
   maritalStatus?: string;
-  transcriptFootNote?: string;
-  portalLogin?: string;
-  portalPassword?: string;
+  vaccinated?: boolean;
+  photoUrl?: string;
 
-  // Academic Info
+  // Family Information
+  fatherName?: string;
+  fatherCnic?: string;
+  fatherCellNo?: string;
+  fatherIts?: string;
+  motherName?: string;
+  motherCnic?: string;
+  motherIts?: string;
+  guardian?: string;
+  siblings?: Sibling[];
+
+  // Academic Details
+  previousEducation?: string;
+  membershipNumber?: string;
+  studentIts?: string;
+  registrationDate?: string;
+  firstPreferenceClass?: string;
+  secondPreferenceClass?: string;
   currentSemester: string;
   admissionDate: string;
-  batch: string;
-  activationDate?: string;
-  leavingSem?: string;
-  leaveDate?: string;
-  status: string;
-  leftReason?: string;
   degreeTitle: string;
-  chartOfAccount?: string;
-  monthlyOrBi: string;
+  batch: string;
   gradePolicy: string;
   graduateYear?: string;
-  specialization?: string;
-  section?: string;
-  totalCreditHours?: number;
-
-  // Academic History - updated to use AcademicEntry type
+  preQualification?: string;
+  transcriptFootNote?: string;
   academicInformation?: AcademicEntry[];
 
-  // Guardian & Contact Persons
-  guardians?: Array<{
-    name: string;
-    relation: string;
-    cnicNumber?: string;
-    phoneNo?: string;
-    cellNo: string;
-    email?: string;
-    designation?: string;
-    company?: string;
-    officeAddress?: string;
-    officePhone?: string;
-    monthlyIncome?: string;
-    vaccinated?: boolean;
-    taxFiler?: boolean;
-  }>;
+  // Administrative & Financial
+  regNumber: string;
+  formFee?: string;
+  segment?: string;
+  sectionType?: string;
+  chartOfAccount?: string;
+  monthlyOrBi: string;
+  securityDepositAccount?: string;
+  temporary?: boolean;
+  advanceAccount?: string;
+  status: string;
+  leftReason?: string;
+  leaveDate?: string;
+  activationDate?: string;
+  leavingSem?: string;
 
-  // Siblings
-  siblings?: Array<{
-    name: string;
-    gender: string;
-    birthDate: string;
-    schoolName?: string;
-  }>;
+  // Contact & Communication
+  personalEmail?: string;
+  smsMobile1?: string;
+  smsMobile2?: string;
+  landMarks?: string;
+  area?: string;
+  officeAddress?: string;
+  officePhoneNo?: string;
 
-  // Fee Setup
-  feeSetup?: {
-    semesterId: string;
-    segment?: string;
-    section?: string;
-    totalCreditHours?: number;
-    specialization?: string;
-    subject?: string;
-    feeGroupId: string;
-    fees?: Array<{
-      type: string;
-      amount: string;
-      dueDate: string;
-      status: string;
-    }>;
-  };
+  // References & Emergency Contacts
+  referral?: Referral;
+  contactPersons?: ContactPerson[];
 
-  // Discounts
-  discounts?: Array<{
-    taxOtherId: string;
-    feeId: string;
-    type: string;
-    percentage: number;
-    amount: number;
-    calculateOn: string;
-    startValidDate: string;
-    endValidDate: string;
-    reference?: string;
-  }>;
-
-  // Documents
-  documents?: Array<{
-    name: string;
-    type: string;
-    uploadDate: string;
-    url: string;
-  }>;
-
-  // Additional Custom Details
+  // Additional Metadata
+  otherInfo?: string;
+  standardEduFrom?: string;
+  transferTo?: string;
   additionalDetails?: CustomDetailEntry[];
 
-  // Activities
+  // For UI purposes
   activities?: Array<{
     title: string;
     description: string;
     date: string;
   }>;
+}
+
+// Types for form values
+export interface PersonalDetailsFormValues {
+  nationality?: string;
+  religion?: string;
+  motherTongue?: string;
+  bloodGroup?: string;
+  height?: string;
+  weight?: string;
+  maritalStatus?: string;
+  castCommunity?: string;
+  vaccinated?: boolean;
 }
