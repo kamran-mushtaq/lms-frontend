@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import apiClient from "@/lib/api-client";
-import { StudentProfile } from "../types";
+import { StudentProfile, AcademicEntry, CustomDetailEntry } from "../types";
 
 interface ApiProfileData {
   _id: string;
@@ -34,6 +34,18 @@ function transformApiDataToProfile(apiData: ApiProfileData): StudentProfile {
     specialization: "",
     monthlyOrBi: "",
     photoUrl: "",
+
+    // Initialize additional personal details
+    nationality: "",
+    religion: "",
+    firstLanguage: "",
+    bloodGroup: "",
+    height: "",
+    weight: "",
+    maritalStatus: "",
+    transcriptFootNote: "",
+
+    // Initialize arrays
     activities: [],
     academicInformation: [],
     guardians: [],
@@ -82,6 +94,111 @@ function transformApiDataToProfile(apiData: ApiProfileData): StudentProfile {
           case "photoUrl":
             profile.photoUrl = item.value;
             break;
+
+          // Additional personal details
+          case "nationality":
+            profile.nationality = item.value;
+            break;
+          case "religion":
+            profile.religion = item.value;
+            break;
+          case "firstLanguage":
+            profile.firstLanguage = item.value;
+            break;
+          case "bloodGroup":
+            profile.bloodGroup = item.value;
+            break;
+          case "height":
+            profile.height = item.value;
+            break;
+          case "weight":
+            profile.weight = item.value;
+            break;
+          case "maritalStatus":
+            profile.maritalStatus = item.value;
+            break;
+          case "transcriptFootNote":
+            profile.transcriptFootNote = item.value;
+            break;
+
+          // Complex arrays that need parsing
+          case "academicInformation":
+            try {
+              const academicInfo = JSON.parse(item.value);
+              if (Array.isArray(academicInfo)) {
+                profile.academicInformation = academicInfo;
+              }
+            } catch (error) {
+              console.error("Error parsing academicInformation:", error);
+              profile.academicInformation = [];
+            }
+            break;
+          case "guardians":
+            try {
+              const guardians = JSON.parse(item.value);
+              if (Array.isArray(guardians)) {
+                profile.guardians = guardians;
+              }
+            } catch (error) {
+              console.error("Error parsing guardians data:", error);
+              profile.guardians = [];
+            }
+            break;
+          case "siblings":
+            try {
+              const siblings = JSON.parse(item.value);
+              if (Array.isArray(siblings)) {
+                profile.siblings = siblings;
+              }
+            } catch (error) {
+              console.error("Error parsing siblings data:", error);
+              profile.siblings = [];
+            }
+            break;
+          case "documents":
+            try {
+              const documents = JSON.parse(item.value);
+              if (Array.isArray(documents)) {
+                profile.documents = documents;
+              }
+            } catch (error) {
+              console.error("Error parsing documents data:", error);
+              profile.documents = [];
+            }
+            break;
+          case "activities":
+            try {
+              const activities = JSON.parse(item.value);
+              if (Array.isArray(activities)) {
+                profile.activities = activities;
+              }
+            } catch (error) {
+              console.error("Error parsing activities data:", error);
+              profile.activities = [];
+            }
+            break;
+          case "additionalDetails":
+            try {
+              const details = JSON.parse(item.value);
+              if (Array.isArray(details)) {
+                profile.additionalDetails = details;
+              }
+            } catch (error) {
+              console.error("Error parsing additionalDetails data:", error);
+              profile.additionalDetails = [];
+            }
+            break;
+
+          // Additional potential fields
+          case "graduateYear":
+            profile.graduateYear = item.value;
+            break;
+          case "section":
+            profile.section = item.value;
+            break;
+          case "totalCreditHours":
+            profile.totalCreditHours = parseInt(item.value, 10) || undefined;
+            break;
         }
       }
     });
@@ -99,17 +216,22 @@ function transformProfileToApiData(
     data: [...existingApiData.data],
   };
 
-  const updateDataItem = (key: string, value: string | undefined) => {
+  const updateDataItem = (key: string, value: any) => {
     if (value === undefined) return;
+
+    // For arrays or objects, stringify them
+    const stringValue =
+      typeof value === "object" ? JSON.stringify(value) : String(value);
+
     const existingIndex = apiData.data!.findIndex((item) => item.key === key);
     if (existingIndex >= 0) {
-      apiData.data![existingIndex].value = value;
+      apiData.data![existingIndex].value = stringValue;
     } else {
-      apiData.data!.push({ key, value });
+      apiData.data!.push({ key, value: stringValue });
     }
   };
 
-  // Map all profile fields
+  // Map basic profile fields
   updateDataItem("dateOfBirth", profile.birthDate);
   updateDataItem("gender", profile.gender);
   updateDataItem("classId", profile.batch);
@@ -122,6 +244,41 @@ function transformProfileToApiData(
   updateDataItem("cnicNumber", profile.cnicNumber);
   updateDataItem("monthlyOrBi", profile.monthlyOrBi);
   updateDataItem("photoUrl", profile.photoUrl);
+
+  // Map additional personal details
+  updateDataItem("nationality", profile.nationality);
+  updateDataItem("religion", profile.religion);
+  updateDataItem("firstLanguage", profile.firstLanguage);
+  updateDataItem("bloodGroup", profile.bloodGroup);
+  updateDataItem("height", profile.height);
+  updateDataItem("weight", profile.weight);
+  updateDataItem("maritalStatus", profile.maritalStatus);
+  updateDataItem("transcriptFootNote", profile.transcriptFootNote);
+
+  // Handle array-based properties - always send complete arrays
+  if (profile.academicInformation !== undefined) {
+    updateDataItem("academicInformation", profile.academicInformation);
+  }
+
+  if (profile.guardians !== undefined) {
+    updateDataItem("guardians", profile.guardians);
+  }
+
+  if (profile.siblings !== undefined) {
+    updateDataItem("siblings", profile.siblings);
+  }
+
+  if (profile.documents !== undefined) {
+    updateDataItem("documents", profile.documents);
+  }
+
+  if (profile.activities !== undefined) {
+    updateDataItem("activities", profile.activities);
+  }
+
+  if (profile.additionalDetails !== undefined) {
+    updateDataItem("additionalDetails", profile.additionalDetails);
+  }
 
   return apiData;
 }
@@ -295,11 +452,21 @@ export function useStudentProfile() {
         );
       }
 
-      // Update local state with new data
+      // Update local state with new data by merging the updated data with existing profile
+      // This ensures we don't lose any data that wasn't part of this update
+      const mergedProfile = {
+        ...profile,
+        ...updatedData,
+      };
+
+      // Also update the raw API data
       setRawApiData(responseData);
-      const updatedProfile = transformApiDataToProfile(responseData);
-      setProfile(updatedProfile);
-      return updatedProfile;
+
+      // Transform the response data to get the full updated profile
+      const fullUpdatedProfile = transformApiDataToProfile(responseData);
+      setProfile(fullUpdatedProfile);
+
+      return fullUpdatedProfile;
     } catch (err) {
       console.error("Error updating profile:", err);
       throw err;

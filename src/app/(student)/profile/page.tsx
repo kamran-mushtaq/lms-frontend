@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { useStudentProfile } from "./hooks/use-student-profile";
-import { StudentProfile } from "./types";
+// import { StudentProfile, AcademicEntry } from "./types";
+import { StudentProfile, AcademicEntry, CustomDetailEntry, PersonalDetailsFormValues } from "./types";
 import {
     Save, X, UserRound, GraduationCap, CreditCard,
     FileText, Users, Info, Camera, ArrowLeft,
@@ -25,6 +26,8 @@ import FinancialsTab from "./components/financials-tab";
 import DocumentsTab from "./components/documents-tab";
 import GuardianInfoTab from "./components/guardian-info-tab";
 import AdditionalInfoTab from "./components/additional-info-tab";
+import { format } from "date-fns";
+
 
 // Profile schema for form validation - making all fields optional for partial updates
 const profileSchema = z.object({
@@ -112,11 +115,105 @@ export default function StudentProfilePage() {
         }
     }, [profile, form]);
 
+
+    const handleUpdatePersonalDetails = async (data: PersonalDetailsFormValues): Promise<void> => {
+        try {
+            console.log("Updating personal details:", data);
+            setIsSubmitting(true);
+
+            // Update profile with the new personal details
+            await updateProfile(data);
+
+            toast({
+                title: "Personal Details Updated",
+                description: "Your additional personal details have been updated successfully.",
+                variant: "success",
+            });
+        } catch (err) {
+            console.error("Error updating personal details:", err);
+            toast({
+                title: "Error",
+                description: err instanceof Error ? err.message : "There was an error updating your personal details. Please try again.",
+                variant: "destructive",
+            });
+            throw err;
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleUpdateCustomDetails = async (details: CustomDetailEntry[]): Promise<void> => {
+        try {
+            console.log("Updating custom details:", details);
+            setIsSubmitting(true);
+
+            // Update profile with the new custom details
+            await updateProfile({
+                additionalDetails: details
+            });
+
+            toast({
+                title: "Custom Fields Updated",
+                description: "Your custom profile fields have been updated successfully.",
+                variant: "success",
+            });
+        } catch (err) {
+            console.error("Error updating custom details:", err);
+            toast({
+                title: "Error",
+                description: err instanceof Error ? err.message : "There was an error updating your custom fields. Please try again.",
+                variant: "destructive",
+            });
+            throw err;
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+   
+
+
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             setPhotoFile(file);
             form.setValue("photoUrl", file ? file.name : "", { shouldValidate: true, shouldDirty: true });
+        }
+    };
+
+    const handleUpdateAcademicInformation = async (academicInfo: AcademicEntry[]) => {
+        try {
+            if (!profile) return;
+
+            console.log("Updating academic information:", academicInfo);
+
+            // Create a clone of the current profile with the updated academic information
+            const updatedProfileData = {
+                ...profile,
+                academicInformation: academicInfo
+            };
+
+            // Extract only the academicInformation field for the API update
+            const updateData = {
+                academicInformation: academicInfo
+            };
+
+            // Update the profile
+            const result = await updateProfile(updateData);
+            console.log("Academic information updated successfully:", result);
+
+            toast({
+                title: "Academic Information Updated",
+                description: "Your academic history has been updated successfully.",
+                variant: "success",
+            });
+        } catch (err) {
+            console.error("Error updating academic information:", err);
+            toast({
+                title: "Error",
+                description: err instanceof Error ? err.message : "There was an error updating your academic information. Please try again.",
+                variant: "destructive",
+            });
         }
     };
 
@@ -132,9 +229,16 @@ export default function StudentProfilePage() {
                 fileData.append("file", photoFile);
                 console.log("Uploading photo:", photoFile);
 
+
                 // Upload photo logic
                 try {
                     const token = localStorage.getItem("token");
+
+                    // const response = await apiClient.post('/api/upload', formData, {
+                    //     headers: {
+                    //         'Content-Type': 'multipart/form-data'
+                    //     }
+                    // });
                     const response = await fetch("https://phpstack-732216-5200333.cloudwaysapps.com/api/upload", {
                         method: "POST",
                         body: fileData,
@@ -154,10 +258,16 @@ export default function StudentProfilePage() {
                     const photoUrl = result.path;
                     data.photoUrl = photoUrl;
                 } catch (uploadError: any) {
-                    // Error handling...
+                    console.error("Error uploading photo:", uploadError);
+                    toast({
+                        title: "Error",
+                        description: uploadError.message || "Failed to upload photo. Please try again.",
+                        variant: "destructive",
+                    });
+                    setIsSubmitting(false);
+                    return; // Exit the function to prevent profile update
                 }
             }
-
 
             // Include photoUrl even if it's not a dirty field, as it's handled separately
             const changedData = Object.keys(data).reduce((acc, key) => {
@@ -201,6 +311,136 @@ export default function StudentProfilePage() {
             setIsSubmitting(false);
         }
     };
+
+
+    const handleUploadDocument = async (data: { name: string; type: string }, file: File): Promise<void> => {
+        try {
+            console.log("Uploading document:", data, file);
+            setIsSubmitting(true);
+
+            // Create form data for file upload
+            const fileData = new FormData();
+            fileData.append("file", file);
+
+            // Upload the file
+            const token = localStorage.getItem("token");
+            const uploadResponse = await fetch("https://phpstack-732216-5200333.cloudwaysapps.com/api/upload", {
+                method: "POST",
+                body: fileData,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error(`Failed to upload document: ${uploadResponse.status}`);
+            }
+
+            const uploadResult = await uploadResponse.json();
+            console.log("Document uploaded successfully:", uploadResult);
+
+            // Get the file path from the response
+            const filePath = uploadResult.path;
+
+            // Now update the profile with the new document info
+            const currentDocuments = profile?.documents || [];
+            const newDocument = {
+                name: data.name,
+                type: data.type,
+                uploadDate: format(new Date(), 'yyyy-MM-dd'),
+                url: filePath
+            };
+
+            const updatedDocuments = [...currentDocuments, newDocument];
+
+            // Update profile with the new document list
+            await updateProfile({
+                documents: updatedDocuments
+            });
+
+            toast({
+                title: "Document Uploaded",
+                description: "Your document has been uploaded successfully.",
+                variant: "success",
+            });
+        } catch (err) {
+            console.error("Error uploading document:", err);
+            toast({
+                title: "Error",
+                description: err instanceof Error ? err.message : "There was an error uploading your document. Please try again.",
+                variant: "destructive",
+            });
+            throw err;
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleDeleteDocument = async (documentUrl: string): Promise<void> => {
+        try {
+            console.log("Deleting document:", documentUrl);
+            setIsSubmitting(true);
+
+            if (!profile?.documents) {
+                throw new Error("No documents found");
+            }
+
+            // Filter out the document with the specified URL
+            const updatedDocuments = profile.documents.filter(doc => doc.url !== documentUrl);
+
+            // Update profile with the filtered document list
+            await updateProfile({
+                documents: updatedDocuments
+            });
+
+            toast({
+                title: "Document Deleted",
+                description: "Your document has been deleted successfully.",
+                variant: "success",
+            });
+        } catch (err) {
+            console.error("Error deleting document:", err);
+            toast({
+                title: "Error",
+                description: err instanceof Error ? err.message : "There was an error deleting your document. Please try again.",
+                variant: "destructive",
+            });
+            throw err;
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+
+    const handleUpdateGuardians = async (guardians: any[]): Promise<void> => {
+        try {
+            console.log("Updating guardian information:", guardians);
+            setIsSubmitting(true);
+
+            // Update profile with the new guardians array
+            await updateProfile({
+                guardians: guardians
+            });
+
+            toast({
+                title: "Guardian Information Updated",
+                description: "Guardian information has been updated successfully.",
+                variant: "success",
+            });
+        } catch (err) {
+            console.error("Error updating guardian information:", err);
+            toast({
+                title: "Error",
+                description: err instanceof Error ? err.message : "There was an error updating guardian information. Please try again.",
+                variant: "destructive",
+            });
+            throw err;
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+
 
     const handleCancel = () => {
         if (form.formState.isDirty) {
@@ -430,6 +670,7 @@ export default function StudentProfilePage() {
                                     profile={profile}
                                     isEditing={isEditing}
                                     form={form}
+                                    onUpdateAcademicInformation={handleUpdateAcademicInformation}
                                 />
                             </TabsContent>
 
@@ -438,15 +679,29 @@ export default function StudentProfilePage() {
                             </TabsContent>
 
                             <TabsContent value="documents" className="m-0">
-                                <DocumentsTab profile={profile} />
+                                <DocumentsTab
+                                    profile={profile}
+                                    isEditing={isEditing}
+                                    onUploadDocument={handleUploadDocument}
+                                    onDeleteDocument={handleDeleteDocument}
+                                />
                             </TabsContent>
 
                             <TabsContent value="guardian" className="m-0">
-                                <GuardianInfoTab profile={profile} />
+                                <GuardianInfoTab
+                                    profile={profile}
+                                    isEditing={isEditing}
+                                    onUpdateGuardians={handleUpdateGuardians}
+                                />
                             </TabsContent>
 
                             <TabsContent value="additional" className="m-0">
-                                <AdditionalInfoTab profile={profile} />
+                                <AdditionalInfoTab
+                                    profile={profile}
+                                    isEditing={isEditing}
+                                    onUpdatePersonalDetails={handleUpdatePersonalDetails}
+                                    onUpdateCustomDetails={handleUpdateCustomDetails}
+                                />
                             </TabsContent>
                         </div>
                     </div>

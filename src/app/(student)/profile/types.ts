@@ -1,11 +1,58 @@
-// Updated StudentProfile type with GitHub fields
+// src/app/(student)/profile/types.ts
+// Complete type definitions for student profile
+
+// Define the academic entry type
+export interface AcademicEntry {
+  institutionName: string;
+  location: string;
+  certification: string;
+  qualificationType: string;
+  qualification: string;
+  year: string;
+}
+
+export interface Guardian {
+  name: string;
+  relation: string;
+  cnicNumber?: string;
+  phoneNo?: string;
+  cellNo: string;
+  email?: string;
+  designation?: string;
+  company?: string;
+  officeAddress?: string;
+  officePhone?: string;
+  monthlyIncome?: string;
+  vaccinated?: boolean;
+  taxFiler?: boolean;
+}
+
+// Define the custom detail entry type
+export interface CustomDetailEntry {
+  type: string;
+  description: string;
+}
+
+// Define types for form values
+export interface PersonalDetailsFormValues {
+  nationality?: string;
+  religion?: string;
+  firstLanguage?: string;
+  bloodGroup?: string;
+  height?: string;
+  weight?: string;
+  maritalStatus?: string;
+  transcriptFootNote?: string;
+}
+
+// Updated StudentProfile type with all fields
 export interface StudentProfile {
   // General Info
   regNumber: string;
   name: string;
   oldGr?: string;
   photoUrl?: string;
-  
+
   // GitHub Integration
   githubUsername?: string;
   githubAvatarUrl?: string;
@@ -58,6 +105,9 @@ export interface StudentProfile {
   section?: string;
   totalCreditHours?: number;
 
+  // Academic History - updated to use AcademicEntry type
+  academicInformation?: AcademicEntry[];
+
   // Guardian & Contact Persons
   guardians?: Array<{
     name: string;
@@ -81,16 +131,6 @@ export interface StudentProfile {
     gender: string;
     birthDate: string;
     schoolName?: string;
-  }>;
-
-  // Academic History
-  academicInformation?: Array<{
-    institutionName: string;
-    location: string;
-    certification: string;
-    qualificationType: string;
-    qualification: string;
-    year: string;
   }>;
 
   // Fee Setup
@@ -131,11 +171,8 @@ export interface StudentProfile {
     url: string;
   }>;
 
-  // Additional Details
-  additionalDetails?: Array<{
-    type: string;
-    description: string;
-  }>;
+  // Additional Custom Details
+  additionalDetails?: CustomDetailEntry[];
 
   // Activities
   activities?: Array<{
