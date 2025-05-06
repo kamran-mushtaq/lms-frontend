@@ -6,9 +6,10 @@ console.log("API_URL:", API_URL);
 
 const apiClient = axios.create({
   baseURL: API_URL,
+  timeout: 10000, // Increase timeout
   headers: {
-    "Content-Type": "application/json"
-  }
+    "Content-Type": "application/json",
+  },
 });
 
 // Add request interceptor for auth headers

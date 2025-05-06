@@ -131,17 +131,10 @@ export default function StudentProfilePage() {
                 const fileData = new FormData();
                 fileData.append("file", photoFile);
                 console.log("Uploading photo:", photoFile);
-                
 
                 // Upload photo logic
                 try {
                     const token = localStorage.getItem("token");
-
-                    // const response = await apiClient.post('/api/upload', formData, {
-                    //     headers: {
-                    //         'Content-Type': 'multipart/form-data'
-                    //     }
-                    // });
                     const response = await fetch("https://phpstack-732216-5200333.cloudwaysapps.com/api/upload", {
                         method: "POST",
                         body: fileData,
@@ -161,16 +154,10 @@ export default function StudentProfilePage() {
                     const photoUrl = result.path;
                     data.photoUrl = photoUrl;
                 } catch (uploadError: any) {
-                    console.error("Error uploading photo:", uploadError);
-                    toast({
-                        title: "Error",
-                        description: uploadError.message || "Failed to upload photo. Please try again.",
-                        variant: "destructive",
-                    });
-                    setIsSubmitting(false);
-                    return; // Exit the function to prevent profile update
+                    // Error handling...
                 }
             }
+
 
             // Include photoUrl even if it's not a dirty field, as it's handled separately
             const changedData = Object.keys(data).reduce((acc, key) => {

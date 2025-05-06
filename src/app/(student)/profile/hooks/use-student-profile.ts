@@ -126,6 +126,9 @@ function transformProfileToApiData(
   return apiData;
 }
 
+// Sleep function for retry delay
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function useStudentProfile() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -154,9 +157,45 @@ export function useStudentProfile() {
           throw new Error("User ID not found. Please log in again.");
         }
 
-        const response = await apiClient.get(`/profiles/${userId}`);
-        setRawApiData(response.data);
-        setProfile(transformApiDataToProfile(response.data));
+        // Add retry logic for the initial fetch
+        let retryCount = 3;
+        let fetchSuccess = false;
+        let lastError;
+
+        while (retryCount > 0 && !fetchSuccess) {
+          try {
+            console.log(
+              `Attempting to fetch profile for user ${userId} (attempt ${
+                4 - retryCount
+              }/3)`
+            );
+            const response = await apiClient.get(`/profiles/${userId}`);
+            console.log("Profile fetch successful:", response.status);
+            setRawApiData(response.data);
+            setProfile(transformApiDataToProfile(response.data));
+            fetchSuccess = true;
+          } catch (err: any) {
+            lastError = err;
+            console.error(
+              `Profile fetch attempt failed (${4 - retryCount}/3):`,
+              err.message
+            );
+            retryCount--;
+            if (retryCount > 0) {
+              // Wait before retry - exponential backoff
+              const delayMs = 1000 * 2 ** (3 - retryCount);
+              console.log(`Retrying in ${delayMs}ms...`);
+              await sleep(delayMs);
+            }
+          }
+        }
+
+        if (!fetchSuccess) {
+          throw (
+            lastError ||
+            new Error("Failed to fetch profile after multiple attempts")
+          );
+        }
       } catch (err: any) {
         console.error("Error fetching student profile:", err);
         setError(err);
@@ -174,7 +213,8 @@ export function useStudentProfile() {
     }
 
     try {
-      const userString = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+      const userString =
+        typeof window !== "undefined" ? localStorage.getItem("user") : null;
       const userId = userString ? JSON.parse(userString)._id : null;
 
       if (!userId) {
@@ -182,14 +222,82 @@ export function useStudentProfile() {
       }
 
       const apiUpdateData = transformProfileToApiData(updatedData, rawApiData);
-      const response = await apiClient.patch(
-        `/profiles/${userId}`,
-        apiUpdateData,
-        { headers: { "Content-Type": "application/json" } }
-      );
+      console.log("Preparing profile update with data:", apiUpdateData);
 
-      setRawApiData(response.data);
-      const updatedProfile = transformApiDataToProfile(response.data);
+      // Add retry logic for updating the profile
+      let retryCount = 3;
+      let updateSuccess = false;
+      let lastError;
+      let responseData;
+
+      while (retryCount > 0 && !updateSuccess) {
+        try {
+          console.log(
+            `Attempting to update profile (attempt ${4 - retryCount}/3)`
+          );
+
+          // Make sure we have the correct Content-Type header
+          const response = await apiClient.patch(
+            `/profiles/${userId}`,
+            apiUpdateData,
+            {
+              headers: {
+                "Content-Type": "application/json",
+                // Ensure we have the auth token
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+              // Increase timeout for potential network issues
+              timeout: 15000,
+            }
+          );
+
+          console.log("Profile update successful:", response.status);
+          responseData = response.data;
+          updateSuccess = true;
+        } catch (err: any) {
+          lastError = err;
+          console.error(
+            `Profile update attempt failed (${4 - retryCount}/3):`,
+            err
+          );
+
+          // Log more detailed error information
+          if (err.response) {
+            console.error("Server response error:", {
+              status: err.response.status,
+              statusText: err.response.statusText,
+              data: err.response.data,
+            });
+          } else if (err.request) {
+            console.error(
+              "No response received from server. Request details:",
+              err.request
+            );
+          } else {
+            console.error("Error details:", err.message);
+          }
+
+          retryCount--;
+
+          if (retryCount > 0) {
+            // Wait before retry - exponential backoff
+            const delayMs = 1000 * 2 ** (3 - retryCount);
+            console.log(`Retrying update in ${delayMs}ms...`);
+            await sleep(delayMs);
+          }
+        }
+      }
+
+      if (!updateSuccess) {
+        throw (
+          lastError ||
+          new Error("Failed to update profile after multiple attempts")
+        );
+      }
+
+      // Update local state with new data
+      setRawApiData(responseData);
+      const updatedProfile = transformApiDataToProfile(responseData);
       setProfile(updatedProfile);
       return updatedProfile;
     } catch (err) {
