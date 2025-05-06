@@ -189,6 +189,32 @@ function transformApiDataToProfile(apiData: ApiProfileData): StudentProfile {
             }
             break;
 
+          // Parent information fields
+          case "fatherName":
+            profile.fatherName = item.value;
+            break;
+          case "fatherCnic":
+            profile.fatherCnic = item.value;
+            break;
+          case "fatherCellNo":
+            profile.fatherCellNo = item.value;
+            break;
+          case "fatherIts":
+            profile.fatherIts = item.value;
+            break;
+          case "motherName":
+            profile.motherName = item.value;
+            break;
+          case "motherCnic":
+            profile.motherCnic = item.value;
+            break;
+          case "motherIts":
+            profile.motherIts = item.value;
+            break;
+          case "guardian":
+            profile.guardian = item.value;
+            break;
+
           // Additional potential fields
           case "graduateYear":
             profile.graduateYear = item.value;
@@ -279,6 +305,16 @@ function transformProfileToApiData(
   if (profile.additionalDetails !== undefined) {
     updateDataItem("additionalDetails", profile.additionalDetails);
   }
+  
+  // Map individual parent/family fields
+  updateDataItem("fatherName", profile.fatherName);
+  updateDataItem("fatherCnic", profile.fatherCnic);
+  updateDataItem("fatherCellNo", profile.fatherCellNo);
+  updateDataItem("fatherIts", profile.fatherIts);
+  updateDataItem("motherName", profile.motherName);
+  updateDataItem("motherCnic", profile.motherCnic);
+  updateDataItem("motherIts", profile.motherIts);
+  updateDataItem("guardian", profile.guardian);
 
   return apiData;
 }

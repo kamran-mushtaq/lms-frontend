@@ -16,21 +16,16 @@ export const getCompleteImageUrl = (relativePath?: string): string => {
       return relativePath;
     }
     
-    // Get the API base URL from environment variables
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    
-    // If no API base URL is configured, just return the relative path
-    if (!apiBaseUrl) {
-      return relativePath;
-    }
+    // Get the API base URL from environment variables or use the hardcoded URL
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://phpstack-732216-5200333.cloudwaysapps.com';
     
     // Remove leading slash if present to avoid double slashes
     const cleanRelativePath = relativePath.startsWith('/') 
       ? relativePath.substring(1) 
       : relativePath;
     
-    // Construct the complete URL
-    return `${apiBaseUrl.endsWith('/') ? apiBaseUrl : apiBaseUrl + '/'}${cleanRelativePath}`;
+    // Construct the complete URL - ensure uploads directory is included
+    return `${apiBaseUrl.endsWith('/') ? apiBaseUrl : apiBaseUrl + '/'}/uploads/${cleanRelativePath}`;
   };
   
   /**

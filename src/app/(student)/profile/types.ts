@@ -86,6 +86,7 @@ export interface StudentProfile {
   maritalStatus?: string;
   vaccinated?: boolean;
   photoUrl?: string;
+  guardians?: Guardian[]; // Add this property
 
   // Family Information
   fatherName?: string;

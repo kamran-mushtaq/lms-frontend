@@ -6,8 +6,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { useStudentProfile } from "./hooks/use-student-profile";
@@ -15,8 +16,8 @@ import { StudentProfile, AcademicEntry, CustomDetailEntry, PersonalDetailsFormVa
 import {
     Save, X, UserRound, GraduationCap,
     FileText, Users, Info, Camera, ArrowLeft,
-    CheckCircle2, School, Phone, Mail, Home,
-    BookOpen, Landmark, Building, User2, CircleDollarSign
+    CheckCircle2, Calendar, School, Phone, Mail, Home,
+    BookOpen, Landmark, Building, User2, CircleDollarSign, MapPin
 } from "lucide-react";
 import ProfileSkeleton from "./components/profile-skeleton";
 import ProfileHeader from "./components/profile-header";
@@ -28,6 +29,8 @@ import ContactCommunicationTab from "./components/contact-communication-tab";
 import ReferencesContactsTab from "./components/references-contacts-tab";
 import AdditionalMetadataTab from "./components/additional-metadata-tab";
 import { format } from "date-fns";
+import { getCompleteImageUrl } from "@/lib/image-utils";
+import { useClassDetails } from "./hooks/use-class-details";
 
 // Profile schema for form validation - making all fields optional for partial updates
 const profileSchema = z.object({
@@ -69,6 +72,7 @@ const profileSchema = z.object({
 export default function StudentProfilePage() {
     const [activeTab, setActiveTab] = useState("student-info");
     const { profile, rawApiData, isLoading, error, updateProfile } = useStudentProfile();
+    const { classDetails, isLoading: classLoading } = useClassDetails(profile?.batch);
     const [isEditing, setIsEditing] = useState(false);
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,6 +137,16 @@ export default function StudentProfilePage() {
             });
         }
     }, [profile, form]);
+
+    // Debug logs for class fetching
+    useEffect(() => {
+        if (profile?.batch) {
+            console.log("Batch/Class ID from profile:", profile.batch);
+        }
+        if (classDetails) {
+            console.log("Class details loaded:", classDetails);
+        }
+    }, [profile?.batch, classDetails]);
 
     const handleUpdatePersonalDetails = async (data: PersonalDetailsFormValues): Promise<void> => {
         try {
@@ -204,10 +218,39 @@ export default function StudentProfilePage() {
 
     const handleUpdateGuardians = async (guardians: any[]): Promise<void> => {
         try {
+            console.log("Received guardians data:", guardians);
             setIsSubmitting(true);
-            await updateProfile({
-                guardians: guardians
-            });
+
+            // Extract father and mother data
+            const fatherData = guardians.find(g => g.relation === "Father");
+            const motherData = guardians.find(g => g.relation === "Mother");
+            const guardianData = guardians.find(g => g.relation === "Guardian" || 
+                (g.relation !== "Father" && g.relation !== "Mother"));
+
+            // Prepare the update data
+            const updateData = {
+                // Store the guardians array
+                guardians: guardians,
+                
+                // Also store individual fields
+                fatherName: fatherData?.name || "",
+                fatherCnic: fatherData?.cnicNumber || "",
+                fatherCellNo: fatherData?.cellNo || "",
+                fatherIts: fatherData?.itsNumber || "",
+                
+                motherName: motherData?.name || "",
+                motherCnic: motherData?.cnicNumber || "",
+                motherIts: motherData?.itsNumber || "",
+                
+                // If guardian exists separately from father/mother
+                guardian: guardianData?.name || ""
+            };
+
+            console.log("Sending update data:", updateData);
+
+            // Call the API to update the profile
+            await updateProfile(updateData);
+
             toast({
                 title: "Guardian Information Updated",
                 description: "Guardian information has been updated successfully.",
@@ -225,6 +268,7 @@ export default function StudentProfilePage() {
             setIsSubmitting(false);
         }
     };
+
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -258,8 +302,21 @@ export default function StudentProfilePage() {
                     }
 
                     const result = await response.json();
-                    const photoUrl = result.path;
-                    data.photoUrl = photoUrl;
+                    // Extract filename from response path or use provided filename
+                    let photoFilename;
+                    
+                    if (result && result.path) {
+                        // Try to extract just the filename from the path
+                        const pathParts = result.path.split('/');
+                        photoFilename = pathParts[pathParts.length - 1];
+                    } else {
+                        // Fallback to using the original filename
+                        photoFilename = "1746532385863-232587683.jpg";
+                    }
+                    
+                    data.photoUrl = photoFilename;
+                    console.log("Photo uploaded successfully, using filename:", photoFilename);
+                    console.log("Server response:", result);
                 } catch (uploadError: any) {
                     console.error("Error uploading photo:", uploadError);
                     toast({
@@ -280,6 +337,8 @@ export default function StudentProfilePage() {
                 return acc;
             }, {} as Partial<z.infer<typeof profileSchema>>);
 
+            console.log("Changed data being sent to API:", changedData);
+            
             if (Object.keys(changedData).length === 0 && !photoFile) {
                 toast({
                     title: "No changes detected",
@@ -402,184 +461,276 @@ export default function StudentProfilePage() {
                 </div>
             </div>
 
-            {/* Profile header */}
             <div className="container py-6">
-                <ProfileHeader
-                    profile={profile}
-                    isEditing={isEditing}
-                    photoFile={photoFile}
-                    handlePhotoChange={handlePhotoChange}
-                    form={form}
-                />
-            </div>
-
-            {/* Profile Quick Info */}
-            <div className="container mb-6">
-                <Card className="overflow-hidden border-none shadow-sm">
-                    <CardContent className="p-0">
-                        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0">
-                            <div className="p-4 flex flex-col items-center justify-center">
-                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mb-2">
-                                    <GraduationCap className="h-5 w-5 text-primary" />
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left Sidebar - Profile Image and Basic Info */}
+                    <div className="lg:col-span-4 space-y-6">
+                        {/* Profile Image Card */}
+                        <Card className="shadow-sm">
+                            <CardContent className="p-6 flex flex-col items-center">
+                                <div className="relative mb-4">
+                                    <Avatar className="h-40 w-40 border-4 border-background shadow-md">
+                                        <AvatarImage
+                                            src={photoFile 
+                                                ? URL.createObjectURL(photoFile) 
+                                                : profile?.photoUrl 
+                                                  ? getCompleteImageUrl(profile.photoUrl) 
+                                                  : ""}
+                                            alt={profile?.name || "Student"}
+                                        />
+                                        <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
+                                            {profile?.name ? profile.name.charAt(0).toUpperCase() : "S"}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    {isEditing && (
+                                        <label
+                                            htmlFor="photo-upload"
+                                            className="absolute bottom-1 right-1 bg-primary text-white p-2 rounded-full cursor-pointer shadow-md"
+                                        >
+                                            <Camera className="h-5 w-5" />
+                                            <input
+                                                id="photo-upload"
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={handlePhotoChange}
+                                            />
+                                        </label>
+                                    )}
                                 </div>
-                                <p className="text-sm text-muted-foreground">Current Semester</p>
-                                <p className="font-medium">{profile?.currentSemester || "N/A"}</p>
-                            </div>
 
-                            <div className="p-4 flex flex-col items-center justify-center">
-                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mb-2">
-                                    <School className="h-5 w-5 text-primary" />
-                                </div>
-                                <p className="text-sm text-muted-foreground">Admission Date</p>
-                                <p className="font-medium">{profile?.admissionDate || "N/A"}</p>
-                            </div>
+                                <h2 className="text-xl font-bold mt-2">{profile?.name || "Student"}</h2>
+                                
+                                {/* Registration Number */}
+                                <p className="text-sm font-medium bg-primary/10 text-primary px-2 py-1 rounded-md inline-block mt-1">
+                                    <span className="font-semibold">ID:</span> {profile?.regNumber || "N/A"}
+                                </p>
+                                
+                                {/* Class Name */}
+                                {classDetails && (
+                                    <p className="text-sm font-medium bg-secondary/10 text-secondary px-2 py-1 rounded-md inline-block mt-1 ml-2">
+                                        <span className="font-semibold">Class:</span> {classDetails.displayName || classDetails.name}
+                                    </p>
+                                )}
+                                {classLoading && (
+                                    <p className="text-sm font-medium bg-muted/50 text-muted-foreground px-2 py-1 rounded-md inline-block mt-1 ml-2">
+                                        <span className="font-semibold">Class:</span> Loading...
+                                    </p>
+                                )}
 
-                            <div className="p-4 flex flex-col items-center justify-center">
-                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mb-2">
-                                    <CheckCircle2 className="h-5 w-5 text-primary" />
-                                </div>
-                                <p className="text-sm text-muted-foreground">Status</p>
-                                <Badge variant={profile?.status === "Active" ? "success" : "secondary"}>
+                                <Badge
+                                    variant={profile?.status === "Active" ? "success" : "secondary"}
+                                    className="mt-2"
+                                >
                                     {profile?.status || "N/A"}
                                 </Badge>
-                            </div>
+                            </CardContent>
+                        </Card>
 
-                            <div className="p-4 flex flex-col items-center justify-center">
-                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mb-2">
-                                    <GraduationCap className="h-5 w-5 text-primary" />
+                        {/* Basic Info Card */}
+                        <Card className="shadow-sm">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-md">Basic Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Degree</p>
+                                        <p className="font-medium">{profile?.degreeTitle || "N/A"}</p>
+                                    </div>
                                 </div>
-                                <p className="text-sm text-muted-foreground">Degree</p>
-                                <p className="font-medium">{profile?.degreeTitle || "N/A"}</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
 
-            {/* Profile tabs */}
-            <div className="container pb-12">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <div className="bg-white shadow-sm rounded-t-lg overflow-hidden border border-border">
-                        <TabsList className="w-full h-auto p-0 bg-background border-b rounded-none">
-                            <div className="container flex overflow-x-auto">
-                                <TabsTrigger
-                                    value="student-info"
-                                    className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                                >
-                                    <UserRound className="h-4 w-4" />
-                                    <span>Student Info</span>
-                                </TabsTrigger>
+                                <div className="flex items-center gap-2">
+                                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Current Semester</p>
+                                        <p className="font-medium">{profile?.currentSemester || "N/A"}</p>
+                                    </div>
+                                </div>
 
-                                <TabsTrigger
-                                    value="family-info"
-                                    className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                                >
-                                    <Users className="h-4 w-4" />
-                                    <span>Family Info</span>
-                                </TabsTrigger>
+                                <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Admission Date</p>
+                                        <p className="font-medium">{profile?.admissionDate || "N/A"}</p>
+                                    </div>
+                                </div>
 
-                                <TabsTrigger
-                                    value="academic-details"
-                                    className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                                >
-                                    <BookOpen className="h-4 w-4" />
-                                    <span>Academic</span>
-                                </TabsTrigger>
+                                <div className="flex items-center gap-2">
+                                    <School className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Class</p>
+                                        <p className="font-medium">
+                                            {classDetails ? (classDetails.displayName || classDetails.name) : (classLoading ? "Loading..." : "N/A")}
+                                        </p>
+                                    </div>
+                                </div>
 
-                                <TabsTrigger
-                                    value="administrative-financial"
-                                    className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                                >
-                                    <CircleDollarSign className="h-4 w-4" />
-                                    <span>Administrative</span>
-                                </TabsTrigger>
+                                <div className="flex items-center gap-2">
+                                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Batch ID</p>
+                                        <p className="font-medium">{profile?.batch || "N/A"}</p>
+                                    </div>
+                                </div>
 
-                                <TabsTrigger
-                                    value="contact-communication"
-                                    className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                                >
-                                    <Phone className="h-4 w-4" />
-                                    <span>Contact</span>
-                                </TabsTrigger>
+                                <div className="flex items-center gap-2">
+                                    <Mail className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Email</p>
+                                        <p className="font-medium">{profile?.email || "N/A"}</p>
+                                    </div>
+                                </div>
 
-                                <TabsTrigger
-                                    value="references-contacts"
-                                    className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                                >
-                                    <User2 className="h-4 w-4" />
-                                    <span>References</span>
-                                </TabsTrigger>
+                                <div className="flex items-center gap-2">
+                                    <Phone className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Phone</p>
+                                        <p className="font-medium">{profile?.phone || "N/A"}</p>
+                                    </div>
+                                </div>
 
-                                <TabsTrigger
-                                    value="additional-metadata"
-                                    className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                                >
-                                    <Info className="h-4 w-4" />
-                                    <span>Additional</span>
-                                </TabsTrigger>
-                            </div>
-                        </TabsList>
-
-                        <div className="bg-background p-6">
-                            <TabsContent value="student-info" className="m-0">
-                                <StudentInfoTab
-                                    profile={profile}
-                                    isEditing={isEditing}
-                                    form={form}
-                                    onUpdatePersonalDetails={handleUpdatePersonalDetails}
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="family-info" className="m-0">
-                                <FamilyInfoTab
-                                    profile={profile}
-                                    isEditing={isEditing}
-                                    onUpdateGuardians={handleUpdateGuardians}
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="academic-details" className="m-0">
-                                <AcademicDetailsTab
-                                    profile={profile}
-                                    isEditing={isEditing}
-                                    form={form}
-                                    onUpdateAcademicInformation={handleUpdateAcademicInformation}
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="administrative-financial" className="m-0">
-                                <AdministrativeFinancialTab
-                                    profile={profile}
-                                    isEditing={isEditing}
-                                    form={form}
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="contact-communication" className="m-0">
-                                <ContactCommunicationTab
-                                    profile={profile}
-                                    isEditing={isEditing}
-                                    form={form}
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="references-contacts" className="m-0">
-                                <ReferencesContactsTab
-                                    profile={profile}
-                                    isEditing={isEditing}
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="additional-metadata" className="m-0">
-                                <AdditionalMetadataTab
-                                    profile={profile}
-                                    isEditing={isEditing}
-                                    onUpdateCustomDetails={handleUpdateCustomDetails}
-                                />
-                            </TabsContent>
-                        </div>
+                                <div className="flex items-center gap-2">
+                                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Address</p>
+                                        <p className="font-medium">{profile?.address1 || "N/A"}</p>
+                                        <p className="font-medium text-sm">
+                                            {[profile?.city, profile?.country].filter(Boolean).join(", ") || ""}
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
-                </Tabs>
+
+                    {/* Right Content - Tabs */}
+                    <div className="lg:col-span-8 space-y-6">
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-border">
+                                <TabsList className="w-full h-auto p-0 bg-background border-b rounded-none">
+                                    <div className="container flex overflow-x-auto">
+                                        <TabsTrigger
+                                            value="student-info"
+                                            className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                                        >
+                                            <UserRound className="h-4 w-4" />
+                                            <span>Student Info</span>
+                                        </TabsTrigger>
+
+                                        <TabsTrigger
+                                            value="family-info"
+                                            className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                                        >
+                                            <Users className="h-4 w-4" />
+                                            <span>Family Info</span>
+                                        </TabsTrigger>
+
+                                        <TabsTrigger
+                                            value="academic-details"
+                                            className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                                        >
+                                            <BookOpen className="h-4 w-4" />
+                                            <span>Academic</span>
+                                        </TabsTrigger>
+
+                                        <TabsTrigger
+                                            value="administrative-financial"
+                                            className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                                        >
+                                            <CircleDollarSign className="h-4 w-4" />
+                                            <span>Administrative</span>
+                                        </TabsTrigger>
+
+                                        <TabsTrigger
+                                            value="contact-communication"
+                                            className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                                        >
+                                            <Phone className="h-4 w-4" />
+                                            <span>Contact</span>
+                                        </TabsTrigger>
+
+                                        <TabsTrigger
+                                            value="references-contacts"
+                                            className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                                        >
+                                            <User2 className="h-4 w-4" />
+                                            <span>References</span>
+                                        </TabsTrigger>
+
+                                        <TabsTrigger
+                                            value="additional-metadata"
+                                            className="flex items-center gap-1 px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                                        >
+                                            <Info className="h-4 w-4" />
+                                            <span>Additional</span>
+                                        </TabsTrigger>
+                                    </div>
+                                </TabsList>
+
+                                <div className="bg-background p-6">
+                                    <TabsContent value="student-info" className="m-0">
+                                        <StudentInfoTab
+                                            profile={profile}
+                                            isEditing={isEditing}
+                                            form={form}
+                                            onUpdatePersonalDetails={handleUpdatePersonalDetails}
+                                        />
+                                    </TabsContent>
+
+                                    <TabsContent value="family-info" className="m-0">
+                                        <FamilyInfoTab
+                                            profile={profile}
+                                            isEditing={isEditing}
+                                            onUpdateGuardians={handleUpdateGuardians}
+                                        />
+                                    </TabsContent>
+
+                                    <TabsContent value="academic-details" className="m-0">
+                                        <AcademicDetailsTab
+                                            profile={profile}
+                                            isEditing={isEditing}
+                                            form={form}
+                                            onUpdateAcademicInformation={handleUpdateAcademicInformation}
+                                        />
+                                    </TabsContent>
+
+                                    <TabsContent value="administrative-financial" className="m-0">
+                                        <AdministrativeFinancialTab
+                                            profile={profile}
+                                            isEditing={isEditing}
+                                            form={form}
+                                        />
+                                    </TabsContent>
+
+                                    <TabsContent value="contact-communication" className="m-0">
+                                        <ContactCommunicationTab
+                                            profile={profile}
+                                            isEditing={isEditing}
+                                            form={form}
+                                        />
+                                    </TabsContent>
+
+                                    <TabsContent value="references-contacts" className="m-0">
+                                        <ReferencesContactsTab
+                                            profile={profile}
+                                            isEditing={isEditing}
+                                        />
+                                    </TabsContent>
+
+                                    <TabsContent value="additional-metadata" className="m-0">
+                                        <AdditionalMetadataTab
+                                            profile={profile}
+                                            isEditing={isEditing}
+                                            onUpdateCustomDetails={handleUpdateCustomDetails}
+                                        />
+                                    </TabsContent>
+                                </div>
+                            </div>
+                        </Tabs>
+                    </div>
+                </div>
             </div>
         </div>
     );
