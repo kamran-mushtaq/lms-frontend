@@ -1,10 +1,14 @@
-// src/app/(student)/profile/types.ts
+// Updated StudentProfile type with GitHub fields
 export interface StudentProfile {
   // General Info
   regNumber: string;
   name: string;
   oldGr?: string;
   photoUrl?: string;
+  
+  // GitHub Integration
+  githubUsername?: string;
+  githubAvatarUrl?: string;
 
   // Contact Info
   address1: string;
@@ -110,7 +114,7 @@ export interface StudentProfile {
   discounts?: Array<{
     taxOtherId: string;
     feeId: string;
-    type: string; // Added the missing type property
+    type: string;
     percentage: number;
     amount: number;
     calculateOn: string;
