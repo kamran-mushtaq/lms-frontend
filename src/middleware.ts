@@ -32,18 +32,31 @@ const SUBJECT_CONTENT_PATHS = [
   '/student/chapters'
 ];
 
+// Define paths that can be accessed at the root level even if normally behind student/
+const ROOT_ACCESSIBLE_PATHS = [
+  '/lectures',
+];
+
 // Paths that are exempt from the aptitude test check
 const APTITUDE_TEST_EXEMPT_PATHS = [
   '/assessment',
   '/api',
   '/admin',
   '/parent',
-  '/teacher'
+  '/teacher',
+  // '/lectures' // Add lectures to exempt paths
 ];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   console.log(`[Middleware] Incoming request for path: ${pathname}`);
+
+  // // Add redirection for /lectures/ID to /student/lectures/ID
+  // if (pathname.startsWith('/lectures/')) {
+  //   const studentPath = `/student${pathname}`;
+  //   console.log(`[Middleware] Redirecting from ${pathname} to ${studentPath}`);
+  //   return NextResponse.redirect(new URL(studentPath, request.url));
+  // }
 
   // Check if the path is public
   if (publicPaths.some((path) => pathname.startsWith(path))) {
@@ -85,6 +98,9 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/parent") && userType !== "parent";
     const isAccessingStudentRoutes =
       pathname.startsWith("/student") && userType !== "student";
+      
+    // Check if the path is one of the root-accessible paths that should bypass student route checks
+    const isRootAccessiblePath = ROOT_ACCESSIBLE_PATHS.some(path => pathname.startsWith(path));
 
     // Log values immediately before the main role/path check
     console.log(`[Middleware] PRE-CHECK: pathname='${pathname}', userType='${userType}'`);
@@ -93,7 +109,7 @@ export async function middleware(request: NextRequest) {
       isAccessingAdminRoutes ||
       isAccessingTeacherRoutes ||
       isAccessingParentRoutes ||
-      isAccessingStudentRoutes ||
+      (isAccessingStudentRoutes && !isRootAccessiblePath) ||
       // Add check for student accessing generic dashboard
       (pathname === '/dashboard' && userType === 'student')
     ) {
@@ -227,6 +243,9 @@ export const config = {
      * - api (API routes)
      * - _next (Next.js files)
      */
-    "/((?!_next/static|_next/image|favicon.ico|public|api|images|_next).*)"
+    "/((?!_next/static|_next/image|favicon.ico|public|api|images|_next).*)",
+    
+    // Explicitly match the lectures path for redirects
+    "/lectures/:path*"
   ]
 };

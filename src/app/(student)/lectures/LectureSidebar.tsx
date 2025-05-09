@@ -37,14 +37,32 @@ interface LectureSidebarProps {
     lectureId: string;
     activeTab: string;
     onTabChange: (tab: string) => void;
-    navigationData: any;
+    navigationData?: {
+        chapterTitle?: string;
+        lectures?: Array<any>;
+    };
 }
+
+// Default empty navigation data
+const DEFAULT_NAV_DATA = {
+    chapterTitle: '',
+    lectures: []
+};
+
+// Helper to extract ID from different formats
+const getId = (item: any): string => {
+    if (!item) return '';
+    if (typeof item === 'string') return item;
+    if (item._id) return item._id;
+    if (item.id) return item.id;
+    return '';
+};
 
 export default function LectureSidebar({
     lectureId,
     activeTab,
     onTabChange,
-    navigationData
+    navigationData = DEFAULT_NAV_DATA
 }: LectureSidebarProps) {
     const router = useRouter();
     const [notes, setNotes] = useState<any[]>([]);
@@ -54,19 +72,65 @@ export default function LectureSidebar({
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [editingNoteContent, setEditingNoteContent] = useState("");
 
+    // Make sure navigationData is never undefined and lectures is always an array
+    const navData = navigationData || DEFAULT_NAV_DATA;
+    const lectures = Array.isArray(navData.lectures) ? navData.lectures : [];
+    const chapterTitle = navData.chapterTitle || '';
+
     // Fetch notes and resources
     useEffect(() => {
         const fetchSidebarData = async () => {
             try {
+                console.log('Fetching sidebar data for lecture:', lectureId);
+                
                 // Fetch notes
-                const notesData = await getNotesByLecture(lectureId);
-                setNotes(notesData.notes);
+                try {
+                    const notesData = await getNotesByLecture(lectureId);
+                    console.log('Notes data received:', notesData);
+                    if (notesData && notesData.notes && Array.isArray(notesData.notes)) {
+                        setNotes(notesData.notes);
+                        console.log('Set notes state with:', notesData.notes.length, 'items');
+                    } else if (notesData && Array.isArray(notesData)) {
+                        // Handle case where API returns an array directly
+                        setNotes(notesData);
+                        console.log('Set notes state with direct array:', notesData.length, 'items');
+                    } else {
+                        console.log('Notes data was in unexpected format, setting empty array');
+                        setNotes([]);
+                    }
+                } catch (notesError) {
+                    console.error('Error fetching notes:', notesError);
+                    setNotes([]);
+                }
 
                 // Fetch resources
-                const resourcesData = await getLectureResources(lectureId);
-                setResources(resourcesData.resources);
+                try {
+                    const resourcesData = await getLectureResources(lectureId);
+                    console.log('Resources data received:', resourcesData);
+                    if (resourcesData && resourcesData.resources && Array.isArray(resourcesData.resources)) {
+                        setResources(resourcesData.resources);
+                        console.log('Set resources state with:', resourcesData.resources.length, 'items');
+                    } else if (resourcesData && Array.isArray(resourcesData)) {
+                        // Handle case where API returns an array directly
+                        setResources(resourcesData);
+                        console.log('Set resources state with direct array:', resourcesData.length, 'items');
+                    } else if (resourcesData && resourcesData.lecture_resources && Array.isArray(resourcesData.lecture_resources)) {
+                        // Handle alternative field name
+                        setResources(resourcesData.lecture_resources);
+                        console.log('Set resources from lecture_resources field:', resourcesData.lecture_resources.length, 'items');
+                    } else {
+                        console.log('Resources data was in unexpected format, setting empty array');
+                        setResources([]);
+                    }
+                } catch (resourcesError) {
+                    console.error('Error fetching resources:', resourcesError);
+                    setResources([]);
+                }
             } catch (error) {
-                console.error("Error fetching sidebar data:", error);
+                console.error('Error fetching sidebar data:', error);
+                // Initialize with empty arrays on error
+                setNotes([]);
+                setResources([]);
             }
         };
 
@@ -407,42 +471,47 @@ export default function LectureSidebar({
                 <TabsContent value="navigation" className="flex-1 p-4 h-full overflow-hidden">
                     <div className="mb-3">
                         <h3 className="text-sm font-medium">Chapter Lectures</h3>
-                        {navigationData?.chapterTitle && (
-                            <p className="text-xs text-muted-foreground">{navigationData.chapterTitle}</p>
+                        {chapterTitle && (
+                            <p className="text-xs text-muted-foreground">{chapterTitle}</p>
                         )}
                     </div>
                     <ScrollArea className="h-full pr-4">
-                        {!navigationData || !navigationData.lectures ? (
+                        {!lectures || lectures.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
                                 <ListOrdered className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                <p>Navigation data not available.</p>
+                                <p>No lectures available for this chapter.</p>
                             </div>
                         ) : (
                             <div className="space-y-2">
-                                {navigationData.lectures.map((lecture: any) => (
-                                    <div
-                                        key={lecture._id}
-                                        className={`flex items-center p-2 rounded-md cursor-pointer hover:bg-accent transition-colors ${lecture._id === lectureId ? 'bg-accent' : ''
-                                            }`}
-                                        onClick={() => navigateToLecture(lecture._id)}
-                                    >
-                                        <div className="mr-3">
-                                            {lecture.completionStatus === 'completed' && (
-                                                <CheckSquare className="h-4 w-4 text-primary" />
-                                            )}
-                                            {lecture.completionStatus === 'in_progress' && (
-                                                <Clock className="h-4 w-4 text-amber-500" />
-                                            )}
-                                            {lecture.completionStatus === 'not_started' && (
-                                                <div className="h-4 w-4 rounded-full border-2 border-muted-foreground" />
-                                            )}
+                                {lectures.map((lecture) => {
+                                    // Extract lecture ID using helper
+                                    const lectureItemId = getId(lecture);
+                                    if (!lecture || !lectureItemId) return null;
+                                    
+                                    return (
+                                        <div
+                                            key={lectureItemId || `lecture-${lecture.title}-${Math.random()}`}
+                                            className={`flex items-center p-2 rounded-md cursor-pointer hover:bg-accent transition-colors ${lectureItemId === lectureId ? 'bg-accent' : ''}`}
+                                            onClick={() => lectureItemId && navigateToLecture(lectureItemId)}
+                                        >
+                                            <div className="mr-3">
+                                                {(lecture.completionStatus === 'completed' || lecture.status === 'completed') && (
+                                                    <CheckSquare className="h-4 w-4 text-primary" />
+                                                )}
+                                                {(lecture.completionStatus === 'in_progress' || lecture.status === 'in_progress') && (
+                                                    <Clock className="h-4 w-4 text-amber-500" />
+                                                )}
+                                                {(!lecture.completionStatus && !lecture.status || lecture.completionStatus === 'not_started' || lecture.status === 'not_started') && (
+                                                    <div className="h-4 w-4 rounded-full border-2 border-muted-foreground" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1">
+                                                <span className="text-sm">{lecture.title || 'Untitled Lecture'}</span>
+                                            </div>
+                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                         </div>
-                                        <div className="flex-1">
-                                            <span className="text-sm">{lecture.title}</span>
-                                        </div>
-                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </ScrollArea>

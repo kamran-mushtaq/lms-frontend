@@ -212,12 +212,13 @@ export default function SubjectsPage() {
     }
   };
   
-  // Handle error display
+  // Handle error display - only show critical errors
   useEffect(() => {
     if (enrollmentsError) {
       toast.error("Failed to load enrolled subjects: " + enrollmentsError.message);
     }
-    if (progressError) {
+    // Only show progress error if it's not a 404 (no progress data found yet)
+    if (progressError && progressError.response?.status !== 404) {
       toast.error("Failed to load progress data: " + progressError.message);
     }
   }, [enrollmentsError, progressError]);
@@ -225,23 +226,42 @@ export default function SubjectsPage() {
   // Loading state
   const isLoading = isLoadingEnrollments || isLoadingProgress;
 
-  // Placeholder subject covers (in a real app, these would be from the backend)
-  const subjectCovers = {
-    mathematics: "/images/subjects/math.jpg",
-    science: "/images/subjects/science.jpg",
-    history: "/images/subjects/history.jpg",
-    english: "/images/subjects/english.jpg",
-    default: "/images/subjects/default.jpg"
-  };
-  
-  // Get a subject cover image based on subject name
-  const getSubjectCover = (subjectName: string) => {
-    const name = subjectName.toLowerCase();
-    if (name.includes("math")) return subjectCovers.mathematics;
-    if (name.includes("science")) return subjectCovers.science;
-    if (name.includes("history")) return subjectCovers.history;
-    if (name.includes("english")) return subjectCovers.english;
-    return subjectCovers.default;
+  // Log the subject data structure for debugging
+  useEffect(() => {
+    if (enrollments && enrollments.length > 0) {
+      console.log('Sample subject data structure:', enrollments[0].subjectId);
+    }
+  }, [enrollments]);
+
+  // Get a subject cover image from the API or use a placeholder
+  const getSubjectCover = (subject: any) => {
+    // First priority: Use the imageUrl field if it exists
+    if (subject.imageUrl) {
+      return subject.imageUrl;
+    }
+    
+    // Second priority: Use coverImage if it exists
+    if (subject.coverImage) {
+      return subject.coverImage.startsWith('http') 
+        ? subject.coverImage 
+        : `https://phpstack-732216-5200333.cloudwaysapps.com${subject.coverImage}`;
+    }
+    
+    // Last resort: If no image is provided, use a placeholder based on subject name
+    const name = subject.name?.toLowerCase() || subject.displayName?.toLowerCase() || '';
+    
+    // Create a subject type mapping for placeholders
+    let subjectType = 'default';
+    
+    if (name.includes('math')) subjectType = 'math';
+    else if (name.includes('science')) subjectType = 'science';
+    else if (name.includes('history')) subjectType = 'history';
+    else if (name.includes('english')) subjectType = 'english';
+    else if (name.includes('geography')) subjectType = 'geography';
+    else if (name.includes('computer')) subjectType = 'computer';
+    
+    // Use a placeholder service as absolute last resort
+    return `https://placehold.co/600x400/e2e8f0/1e293b?text=${subjectType.charAt(0).toUpperCase() + subjectType.slice(1)}`;
   };
 
   return (
@@ -391,7 +411,7 @@ export default function SubjectsPage() {
                         progress={subject.progress.completionPercentage}
                         completedChapters={subject.progress.completedChapters}
                         totalChapters={subject.progress.totalChapters}
-                        image={getSubjectCover(subject.subjectId.name)}
+                        image={getSubjectCover(subject.subjectId)}
                         onClick={() => handleSubjectClick(subject.subjectId._id)}
                         lastAccessedAt={subject.progress.lastAccessedAt}
                         nextChapterName={subject.progress.nextChapterName}
@@ -408,7 +428,7 @@ export default function SubjectsPage() {
                         progress={subject.progress.completionPercentage}
                         completedChapters={subject.progress.completedChapters}
                         totalChapters={subject.progress.totalChapters}
-                        image={getSubjectCover(subject.subjectId.name)}
+                        image={getSubjectCover(subject.subjectId)}
                         onClick={() => handleSubjectClick(subject.subjectId._id)}
                         lastAccessedAt={subject.progress.lastAccessedAt}
                       />

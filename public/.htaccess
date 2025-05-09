@@ -1,0 +1,7 @@
+# .htaccess redirect for lectures path
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  
+  # Redirect /lectures/ID to /student/lectures/ID
+  RewriteRule ^lectures/([^/]+)$ /student/lectures/$1 [R=302,L]
+</IfModule>

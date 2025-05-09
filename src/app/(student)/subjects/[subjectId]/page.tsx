@@ -133,7 +133,24 @@ export default function SubjectDetailPage() {
       return;
     }
     
-    router.push(`/chapters/${subjectProgress.nextChapterId}`);
+    // Log information about the next chapter
+    console.log('Continue Learning - Next chapter ID:', subjectProgress.nextChapterId);
+    console.log('Continue Learning - Next chapter name:', subjectProgress.nextChapterName);
+    
+    // Store the subject ID in localStorage to help the chapter page find related chapters if needed
+    try {
+      localStorage.setItem('lastVisitedSubject', subjectId);
+      console.log('Stored lastVisitedSubject:', subjectId);
+    } catch (err) {
+      console.warn('Failed to store subject ID in localStorage:', err);
+    }
+    
+    // Use direct navigation to avoid any issues with router
+    const url = `/chapters/${subjectProgress.nextChapterId}`;
+    console.log(`Navigation URL: ${url}`);
+    
+    // Use direct navigation to ensure we get to the right URL
+    window.location.href = url;
   };
   
   const handleBookmark = () => {

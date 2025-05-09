@@ -39,7 +39,6 @@ const fetchStudentProgress = async (studentId: string, classId?: string): Promis
   try {
     // Try to fetch from the actual endpoint path
     // If classId is provided, fetch class-specific progress.
-    // If classId is provided, fetch class-specific progress.
     // Otherwise, try fetching all subject progress from /students/{id}/progress
     const url = classId
       ? `/student-progress/${studentId}/class/${classId}`
@@ -49,7 +48,15 @@ const fetchStudentProgress = async (studentId: string, classId?: string): Promis
     // If we got progress data back, use it
     // Return the data directly. If it's empty, the calling component will handle it.
     return response.data || [];
-  } catch (error) {
+  } catch (error: any) {
+    // If the error is because no progress exists yet (404), return an empty array
+    // This prevents errors from being thrown just because a student is new
+    if (error.response && error.response.status === 404) {
+      console.log("No progress data found for student yet, returning empty array");
+      return [];
+    }
+    
+    // For all other errors, log and rethrow
     console.error("Error fetching student progress:", error);
     throw error;
   }

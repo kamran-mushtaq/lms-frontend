@@ -384,7 +384,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log(`[AuthContext] Student profile completed status: ${isProfileCompleted}`);
 
           if (!isProfileCompleted) {
-            redirectPath = "/profile";
+            redirectPath = "/student/dashboard";
             console.log(`[AuthContext] Student profile not completed. Redirecting to: ${redirectPath}`);
           } else {
             // Existing logic for aptitude test check

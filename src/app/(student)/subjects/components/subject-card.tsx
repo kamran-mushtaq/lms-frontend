@@ -1,7 +1,8 @@
 // src/app/(student)/subjects/components/subject-card.tsx
 import Image from "next/image";
+import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { BookOpen, Clock, ArrowRight } from "lucide-react";
+import { BookOpen, Clock, ArrowRight, BookType } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,17 +58,30 @@ export function SubjectCard({
 
   const lastAccessed = getLastAccessedText();
 
+  const [imageError, setImageError] = useState(false);
+
   return (
     <Card className="overflow-hidden transition-all duration-200 hover:shadow-md">
-      <div className="relative h-40 w-full">
-        <Image
-          src={image}
-          alt={title}
-          fill
-          className="object-cover"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+      <div className="relative h-40 w-full bg-gray-100">
+        {!imageError ? (
+          <Image
+            src={image}
+            alt={title}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            onError={() => setImageError(true)}
+            // Placeholder image while loading
+            placeholder="blur"
+            blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN88Pj+fwAIJgNmYNlx2AAAAABJRU5ErkJggg=="
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+            <BookType className="h-12 w-12 text-gray-400" />
+            <span className="sr-only">{title}</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
         <div className="absolute bottom-3 left-3">
           <Badge variant="secondary" className="text-xs">{className}</Badge>
         </div>

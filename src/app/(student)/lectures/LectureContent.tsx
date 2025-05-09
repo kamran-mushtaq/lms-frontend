@@ -43,13 +43,36 @@ export default function LectureContent({
     // Fetch transcript if available
     useEffect(() => {
         const fetchTranscript = async () => {
-            if (lecture?.transcript) {
+            if (lecture?.hasTranscript || lecture?.transcript) {
                 try {
+                    if (lecture.transcript && Array.isArray(lecture.transcript)) {
+                        console.log('Using transcript from lecture object:', lecture.transcript.length, 'items');
+                        setTranscript(lecture.transcript);
+                        return;
+                    }
+                    
+                    console.log('Fetching transcript for lecture:', lecture._id);
                     const transcriptData = await getLectureTranscript(lecture._id);
-                    setTranscript(transcriptData.transcript);
+                    console.log('Transcript data response:', transcriptData);
+                    
+                    if (transcriptData && Array.isArray(transcriptData.transcript)) {
+                        console.log('Setting transcript from response.transcript:', transcriptData.transcript.length, 'items');
+                        setTranscript(transcriptData.transcript);
+                    } else if (transcriptData && Array.isArray(transcriptData)) {
+                        console.log('Setting transcript from direct array response:', transcriptData.length, 'items');
+                        setTranscript(transcriptData);
+                    } else {
+                        console.log('No transcript data found in expected format');
+                        setTranscript([]);
+                    }
                 } catch (error) {
                     console.error("Error fetching transcript:", error);
+                    // Set empty transcript to avoid errors
+                    setTranscript([]);
                 }
+            } else {
+                console.log('No transcript available for this lecture');
+                setTranscript([]);
             }
         };
 

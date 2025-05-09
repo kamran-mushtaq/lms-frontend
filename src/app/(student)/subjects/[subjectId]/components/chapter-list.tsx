@@ -1,7 +1,7 @@
 // src/app/(student)/subjects/[subjectId]/components/chapter-list.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -34,12 +34,43 @@ export function ChapterList({ chapters, completedChapters }: ChapterListProps) {
   // Sort chapters by order
   const sortedChapters = [...chapters].sort((a, b) => a.order - b.order);
 
+  // Log chapter data to debug
+  useEffect(() => {
+    console.log('ChapterList - chapters:', chapters);
+    console.log('ChapterList - chapter IDs:', chapters.map(c => c._id));
+    console.log('ChapterList - completedChapters:', completedChapters);
+  }, [chapters, completedChapters]);
+
   const getChapterProgress = (chapterId: string) => {
     return completedChapters.find(cp => cp.id === chapterId) || null;
   };
   
-  const handleStartChapter = (chapterId: string) => {
-    router.push(`/chapters/${chapterId}`);
+  // Log each button click with complete chapter details
+  const handleStartChapter = (chapterId: string, chapter: Chapter) => {
+    // Log the complete chapter object and ID for debugging
+    console.log(`Navigating to chapter:`, {
+      id: chapterId,
+      name: chapter.name,
+      displayName: chapter.displayName,
+      fullObject: chapter
+    });
+    
+    // Store the subject ID in localStorage to help the chapter page find related chapters if needed
+    try {
+      if (chapter.subjectId) {
+        localStorage.setItem('lastVisitedSubject', chapter.subjectId);
+        console.log('Stored lastVisitedSubject:', chapter.subjectId);
+      }
+    } catch (err) {
+      console.warn('Failed to store subject ID in localStorage:', err);
+    }
+    
+    // Important: Make sure the URL includes only the chapter ID, not any other data
+    const url = `/chapters/${chapterId}`;
+    console.log(`Navigation URL: ${url}`);
+    
+    // Use direct navigation to avoid any bundling or wrapping of the ID
+    window.location.href = url;
   };
 
   return (
@@ -131,7 +162,7 @@ export function ChapterList({ chapters, completedChapters }: ChapterListProps) {
                   <Button
                     className="w-full sm:w-auto"
                     disabled={isLocked}
-                    onClick={() => handleStartChapter(chapter._id)}
+                    onClick={() => handleStartChapter(chapter._id, chapter)}
                   >
                     {isCompleted ? "Review Chapter" : isInProgress ? "Continue Chapter" : "Start Chapter"}
                     <ArrowRightIcon className="h-4 w-4 ml-2" />

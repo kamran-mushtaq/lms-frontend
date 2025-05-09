@@ -1,7 +1,8 @@
 // src/app/(student)/subjects/components/subject-list-item.tsx
 import Image from "next/image";
+import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { BookOpen, Clock, ArrowRight, ExternalLink } from "lucide-react";
+import { BookOpen, Clock, ArrowRight, BookType } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -51,6 +52,9 @@ export function SubjectListItem({
   };
 
   const lastAccessed = getLastAccessedText();
+  
+  // State for image loading errors
+  const [imageError, setImageError] = useState(false);
 
   return (
     <div
@@ -60,13 +64,22 @@ export function SubjectListItem({
         onClick();
       }}
     >
-      <div className="relative h-16 w-16 rounded-md overflow-hidden flex-shrink-0">
-        <Image
-          src={image}
-          alt={title}
-          fill
-          className="object-cover"
-        />
+      <div className="relative h-16 w-16 rounded-md overflow-hidden flex-shrink-0 bg-gray-100">
+        {!imageError ? (
+          <Image
+            src={image}
+            alt={title}
+            fill
+            className="object-cover"
+            onError={() => setImageError(true)}
+            placeholder="blur"
+            blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN88Pj+fwAIJgNmYNlx2AAAAABJRU5ErkJggg=="
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+            <BookType className="h-8 w-8 text-gray-400" />
+          </div>
+        )}
       </div>
       
       <div className="flex-1">

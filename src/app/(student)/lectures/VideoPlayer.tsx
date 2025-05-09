@@ -1,10 +1,11 @@
 // src/components/student/lecture/VideoPlayer.tsx
 import { useState, useEffect, useRef } from "react";
+import { YouTubeEmbed } from "@next/third-parties/youtube";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
     PlayCircle, PauseCircle, Volume2, VolumeX,
-    Maximize, Minimize, RotateCcw, Settings
+    Maximize, Minimize, RotateCcw, Settings, CheckCircle
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -46,16 +47,44 @@ export default function VideoPlayer({
     const [showControls, setShowControls] = useState(true);
     const [loading, setLoading] = useState(true);
     const [playbackRate, setPlaybackRate] = useState(1);
-    const [quality, setQuality] = useState<string>("auto");
     const [progress, setProgress] = useState(initialProgress || 0);
+    const [showSavedIndicator, setShowSavedIndicator] = useState(false);
+    const [videoError, setVideoError] = useState<string | null>(null);
 
     const progressReportTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastReportedTimeRef = useRef<number>(0);
 
-    // Initialize video
+    // Check if URL is a YouTube URL
+    const isYoutubeUrl = (url: string): boolean => {
+        const youtubeRegex = /^(https?:)?\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})(&.*)?$/;
+        return youtubeRegex.test(url);
+    };
+
+    // Extract YouTube video ID from URL
+    const getYoutubeVideoId = (url: string): string | null => {
+        const match = url.match(/^(https?:)?\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})(&.*)?$/);
+        return match && match[4] ? match[4] : null;
+    };
+
+    // Check if video is YouTube
+    const [isYoutube, setIsYoutube] = useState(videoUrl ? isYoutubeUrl(videoUrl) : false);
+    const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
+
     useEffect(() => {
-        if (videoRef.current) {
+        if (videoUrl) {
+            const isYT = isYoutubeUrl(videoUrl);
+            setIsYoutube(isYT);
+            if (isYT) {
+                const videoId = getYoutubeVideoId(videoUrl);
+                setYoutubeVideoId(videoId);
+            }
+        }
+    }, [videoUrl]);
+
+    // Initialize video and attempt playback after load
+    useEffect(() => {
+        if (!isYoutube && videoRef.current) {
             videoRef.current.volume = volume;
             videoRef.current.muted = isMuted;
             videoRef.current.playbackRate = playbackRate;
@@ -66,9 +95,45 @@ export default function VideoPlayer({
                 videoRef.current.currentTime = startTimeSeconds;
                 setCurrentTime(startTimeSeconds);
             }
-        }
 
-        // Setup event listeners for mousemove to show/hide controls
+            // Add error handling for video element
+            const handleVideoError = () => {
+                if (videoRef.current) {
+                    const errorCode = videoRef.current.error?.code;
+                    let errorMessage = "An error occurred while playing the video.";
+                    
+                    switch (errorCode) {
+                        case 1: // MEDIA_ERR_ABORTED
+                            errorMessage = "The video playback was aborted.";
+                            break;
+                        case 2: // MEDIA_ERR_NETWORK
+                            errorMessage = "A network error caused the video download to fail.";
+                            break;
+                        case 3: // MEDIA_ERR_DECODE
+                            errorMessage = "The video could not be decoded.";
+                            break;
+                        case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
+                            errorMessage = "The video format is not supported.";
+                            break;
+                    }
+                    
+                    setVideoError(errorMessage);
+                    setLoading(false);
+                }
+            };
+
+            videoRef.current.addEventListener('error', handleVideoError);
+            
+            return () => {
+                if (videoRef.current) {
+                    videoRef.current.removeEventListener('error', handleVideoError);
+                }
+            };
+        }
+    }, [initialProgress, duration, volume, isMuted, playbackRate]);
+
+    // Setup mouse control events
+    useEffect(() => {
         const container = containerRef.current;
         if (container) {
             const handleMouseMove = () => {
@@ -99,7 +164,7 @@ export default function VideoPlayer({
                 }
             };
         }
-    }, [initialProgress, duration, volume, isMuted, playbackRate, isPlaying]);
+    }, [isPlaying]);
 
     // Handle time updates
     const handleTimeUpdate = () => {
@@ -132,9 +197,21 @@ export default function VideoPlayer({
                     clearTimeout(progressReportTimeoutRef.current);
                 }
 
-                progressReportTimeoutRef.current = setTimeout(() => {
-                    updateLectureProgress(lectureId, { progress: calculatedProgress, currentTime: time });
-                }, 2000);
+                const saveProgress = async () => {
+                    try {
+                        await updateLectureProgress(lectureId, { 
+                            progress: calculatedProgress, 
+                            currentTime: time 
+                        });
+                        // Show saved indicator 
+                        setShowSavedIndicator(true);
+                        setTimeout(() => setShowSavedIndicator(false), 2000);
+                    } catch (err) {
+                        console.error("Error updating lecture progress:", err);
+                    }
+                };
+                
+                progressReportTimeoutRef.current = setTimeout(saveProgress, 2000);
             }
         }
     };
@@ -145,9 +222,21 @@ export default function VideoPlayer({
             if (isPlaying) {
                 videoRef.current.pause();
             } else {
-                videoRef.current.play();
+                // Use the play() Promise to handle autoplay restrictions
+                const playPromise = videoRef.current.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            setIsPlaying(true);
+                            setVideoError(null);
+                        })
+                        .catch(error => {
+                            console.error("Error playing video:", error);
+                            setVideoError("Could not play video. This may be due to autoplay restrictions.");
+                        });
+                }
             }
-            setIsPlaying(!isPlaying);
         }
     };
 
@@ -217,67 +306,119 @@ export default function VideoPlayer({
     return (
         <div
             ref={containerRef}
-            className="relative w-full h-full bg-black rounded-md overflow-hidden group"
+            className="relative w-full h-full bg-black rounded-lg overflow-hidden group focus:outline-none focus:ring-2 focus:ring-primary"
         >
-            {/* Video Element */}
-            <video
-                ref={videoRef}
-                src={videoUrl}
-                className="w-full h-full"
-                poster={thumbnailUrl}
-                onTimeUpdate={handleTimeUpdate}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onWaiting={() => setLoading(true)}
-                onCanPlay={() => setLoading(false)}
-                onEnded={() => {
-                    setIsPlaying(false);
-                    onProgress(100);
-                }}
-                onClick={togglePlay}
-            />
+            {/* Video Element - Show regular video player for MP4 or YouTube embed for YouTube URLs */}
+            {isYoutube && youtubeVideoId ? (
+                <div className="w-full h-full">
+                    <iframe
+                        src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=0&controls=1&rel=0&modestbranding=1`}
+                        className="w-full h-full"
+                        title="YouTube video player"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    ></iframe>
+                </div>
+            ) : (
+                <video
+                    ref={videoRef}
+                    src={videoUrl}
+                    className="w-full h-full"
+                    poster={thumbnailUrl}
+                    onTimeUpdate={handleTimeUpdate}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onWaiting={() => setLoading(true)}
+                    onCanPlay={() => setLoading(false)}
+                    onEnded={() => {
+                        setIsPlaying(false);
+                        onProgress(100);
+                    }}
+                    onClick={togglePlay}
+                    controls={false} // Disable default controls
+                    playsInline // Better mobile experience
+                    preload="auto" // Preload for better playback
+                />
+            )}
 
-            {/* Loading Indicator */}
-            {loading && (
+            {/* Loading Indicator - Only show for non-YouTube videos */}
+            {!isYoutube && loading && !videoError && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
                     <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
 
-            {/* Big Play Button (only when paused) */}
-            {!isPlaying && (
+            {/* Video Error Message - Only show for non-YouTube videos */}
+            {!isYoutube && videoError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 text-white p-6">
+                    <div className="max-w-md text-center">
+                        <div className="text-red-500 mb-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 mx-auto mb-2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="12"/>
+                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">Video Error</h3>
+                        <p className="mb-4">{videoError}</p>
+                        <Button 
+                            variant="default" 
+                            onClick={() => {
+                                setVideoError(null);
+                                if (videoRef.current) {
+                                    videoRef.current.load();
+                                }
+                            }}
+                        >
+                            Try Again
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Save Progress Indicator */}
+            {showSavedIndicator && (
+                <div className="absolute top-4 right-4 bg-green-500/90 text-white px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 shadow-md">
+                    <CheckCircle className="h-4 w-4" />
+                    Progress saved
+                </div>
+            )}
+
+            {/* Big Play Button (only when paused, for non-YouTube videos) */}
+            {!isYoutube && !isPlaying && !loading && !videoError && (
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full text-white bg-black bg-opacity-50 hover:bg-opacity-70"
+                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full text-white bg-primary/80 hover:bg-primary shadow-lg"
                     onClick={togglePlay}
                 >
-                    <PlayCircle className="h-10 w-10" />
+                    <PlayCircle className="h-12 w-12" />
                 </Button>
             )}
 
-            {/* Video Controls */}
-            <div
-                className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
-                    }`}
-            >
+            {/* Video Controls - Only show for non-YouTube videos since YouTube has its own controls */}
+            {!isYoutube && (
+                <div
+                    className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-4 pt-8 pb-4 transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}
+                >
                 {/* Progress Bar */}
                 <Slider
                     value={[currentTime / duration * 100]}
                     onValueChange={handleSeek}
                     max={100}
                     step={0.1}
-                    className="mb-2"
+                    className="h-1.5 mb-3 hover:h-2.5 transition-all duration-200"
                 />
 
                 {/* Controls Row */}
                 <div className="flex items-center justify-between text-white">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-3">
                         {/* Play/Pause Button */}
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="text-white hover:bg-white/20"
+                            className="text-white rounded-full hover:bg-white/20"
                             onClick={togglePlay}
                         >
                             {isPlaying ? (
@@ -288,18 +429,18 @@ export default function VideoPlayer({
                         </Button>
 
                         {/* Time Display */}
-                        <div className="text-xs">
+                        <div className="text-xs min-w-[100px]">
                             {formatTime(currentTime)} / {formatTime(duration)}
                         </div>
                     </div>
 
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-2">
                         {/* Volume Control */}
                         <div className="flex items-center">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-white hover:bg-white/20"
+                                className="text-white rounded-full hover:bg-white/20"
                                 onClick={toggleMute}
                             >
                                 {isMuted || volume === 0 ? (
@@ -321,7 +462,7 @@ export default function VideoPlayer({
                         {/* Playback Speed */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-white hover:bg-white/20">
+                                <Button variant="ghost" size="icon" className="text-white rounded-full hover:bg-white/20">
                                     <Settings className="h-5 w-5" />
                                 </Button>
                             </DropdownMenuTrigger>
@@ -344,7 +485,7 @@ export default function VideoPlayer({
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="text-white hover:bg-white/20"
+                            className="text-white rounded-full hover:bg-white/20"
                             onClick={() => {
                                 if (videoRef.current) {
                                     videoRef.current.currentTime = 0;
@@ -359,7 +500,7 @@ export default function VideoPlayer({
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="text-white hover:bg-white/20"
+                            className="text-white rounded-full hover:bg-white/20"
                             onClick={toggleFullscreen}
                         >
                             {isFullscreen ? (
@@ -371,6 +512,7 @@ export default function VideoPlayer({
                     </div>
                 </div>
             </div>
+            )}
         </div>
     );
 }
