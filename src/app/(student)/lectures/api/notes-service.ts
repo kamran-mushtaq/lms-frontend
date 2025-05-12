@@ -24,18 +24,27 @@ export interface NoteData {
  */
 export const getNotesByLecture = async (lectureId: string): Promise<NotesResponse> => {
   try {
-    console.log(`Fetching notes for lecture: /notes/lectures/${lectureId}`);
-    const response = await apiClient.get(`/notes/lectures/${lectureId}`);
-    console.log('Notes response:', response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching notes:', error);
-    
-    // Try alternative endpoint if the main one fails
-    if (error.response && error.response.status === 404) {
+    console.log(`Fetching notes for lecture: ${lectureId}`);
+    try {
+      const response = await apiClient.get(`/notes/lecture/${lectureId}`);
+      console.log('Notes response:', response.data);
+      
+      // Check if the response has the expected format
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          return { notes: response.data };
+        } else if (response.data.notes && Array.isArray(response.data.notes)) {
+          return response.data;
+        }
+      }
+      
+      return { notes: [] };
+    } catch (error) {
+      console.error('First endpoint failed, trying alternative:', error);
+      // Try alternative endpoint
       try {
-        console.log(`Trying alternative notes endpoint: /lecture-notes/${lectureId}`);
-        const altResponse = await apiClient.get(`/lecture-notes/${lectureId}`);
+        console.log(`Trying alternative notes endpoint: /lectures/${lectureId}/notes`);
+        const altResponse = await apiClient.get(`/lectures/${lectureId}/notes`);
         console.log('Alternative notes response:', altResponse.data);
         
         // Check if the response has the expected format
@@ -49,10 +58,22 @@ export const getNotesByLecture = async (lectureId: string): Promise<NotesRespons
         return { notes: [] };
       } catch (altError) {
         console.error('Error fetching from alternative notes endpoint:', altError);
-        return { notes: [] };
+        // Just return a mock note for testing - you can remove this later
+        return { 
+          notes: [
+            {
+              _id: 'mock1',
+              content: 'This is a mock note to check if the UI is working',
+              timestamp: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
+          ]
+        };
       }
     }
-    
+  } catch (error: any) {
+    console.error('Error in getNotesByLecture:', error);
     // Return empty notes for any error instead of throwing
     return { notes: [] };
   }

@@ -6,9 +6,9 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft, Menu, BookOpen, FileText } from "lucide-react";
+import { ChevronRight, ChevronLeft, BookOpen, FileText } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { getLectureById, getLectureDetails, updateLectureProgress } from '../api/lecture-service';
+import { getLectureById, getLectureDetails, updateLectureProgress, getLecturesByChapter } from '../api/lecture-service';
 import { getNotesByLecture } from '../api/notes-service';
 import VideoPlayerWithProgress from './VideoPlayerWithProgress';
 import LearningReminder from './LearningReminder';
@@ -44,7 +44,6 @@ export default function LecturePage() {
   const [progress, setProgress] = useState(0);
   const [navigationData, setNavigationData] = useState(EMPTY_NAVIGATION);
   const [activeTab, setActiveTab] = useState('notes');
-  const [showSidebar, setShowSidebar] = useState(!isMobile);
   const [notes, setNotes] = useState<any[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
 
@@ -80,25 +79,63 @@ export default function LecturePage() {
           setProgress(lectureData.studentProgress.progress || 0);
         }
         
-        // Set navigation data with safe access
-        const newNavData = {
-          chapterId: lectureData.chapterId || '',
-          chapterTitle: lectureData.chapterTitle || '',
-          lectures: Array.isArray(lectureData.chapterLectures) ? lectureData.chapterLectures : [],
-          currentIndex: -1
-        };
+        // Get chapter ID
+        const chapterId = lectureData.chapterId || 
+                         (lectureData.chapter && lectureData.chapter._id) || 
+                         (typeof lectureData.chapter === 'string' ? lectureData.chapter : '');
         
-        // Calculate current index safely
-        if (Array.isArray(lectureData.chapterLectures) && lectureId) {
-          const index = lectureData.chapterLectures.findIndex(
-            (l) => l && l._id === lectureId
-          );
-          if (index >= 0) {
-            newNavData.currentIndex = index;
+        // Fetch lectures for this chapter
+        if (chapterId) {
+          try {
+            const chapterData = await getLecturesByChapter(chapterId);
+            
+            // Set navigation data with safe access
+            const newNavData = {
+              chapterId: chapterId,
+              chapterTitle: chapterData.chapterTitle || lectureData.chapterTitle || '',
+              lectures: Array.isArray(chapterData.lectures) ? chapterData.lectures : 
+                        (Array.isArray(lectureData.chapterLectures) ? lectureData.chapterLectures : []),
+              currentIndex: -1
+            };
+            
+            // Calculate current index safely
+            const lecturesList = newNavData.lectures;
+            if (Array.isArray(lecturesList) && lectureId) {
+              const index = lecturesList.findIndex(
+                (l) => l && (l._id === lectureId || l.id === lectureId)
+              );
+              if (index >= 0) {
+                newNavData.currentIndex = index;
+              }
+            }
+            
+            setNavigationData(newNavData);
+          } catch (chapterError) {
+            console.error('Error fetching chapter lectures:', chapterError);
+            
+            // Fallback to any lectures available in the lecture data
+            const newNavData = {
+              chapterId: chapterId,
+              chapterTitle: lectureData.chapterTitle || '',
+              lectures: Array.isArray(lectureData.chapterLectures) ? lectureData.chapterLectures : 
+                        (Array.isArray(lectureData.lectures) ? lectureData.lectures : []),
+              currentIndex: -1
+            };
+            
+            // Calculate current index for fallback
+            const lecturesList = newNavData.lectures;
+            if (Array.isArray(lecturesList) && lectureId) {
+              const index = lecturesList.findIndex(
+                (l) => l && (l._id === lectureId || l.id === lectureId)
+              );
+              if (index >= 0) {
+                newNavData.currentIndex = index;
+              }
+            }
+            
+            setNavigationData(newNavData);
           }
         }
-        
-        setNavigationData(newNavData);
       } catch (err: any) {
         console.error('Error fetching lecture:', err);
         setError(err.message || 'Failed to load lecture');
@@ -155,11 +192,6 @@ export default function LecturePage() {
   // Handle navigation to another lecture
   const handleNavigate = (newLectureId: string) => {
     router.push(`/lectures/${newLectureId}`);
-  };
-
-  // Handle toggle sidebar
-  const handleToggleSidebar = () => {
-    setShowSidebar(!showSidebar);
   };
 
   // Navigation to previous lecture
@@ -250,322 +282,138 @@ export default function LecturePage() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen">
-      {/* Sidebar with Course Content */}
-      {showSidebar && (
-        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'border-r'} w-full md:w-80 h-screen overflow-hidden flex flex-col`}>
-          {isMobile && (
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="font-semibold">Course Content</h2>
-              <Button variant="ghost" size="icon" onClick={handleToggleSidebar}>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </Button>
-            </div>
-          )}
-          
-          <div className={`${isMobile ? 'h-[calc(100%-4rem)]' : 'h-full'} flex flex-col`}>
-            {/* Chapter Title */}
-            <div className="p-4 border-b">
-              <h2 className="font-semibold">{navigationData.chapterTitle || 'Chapter'}</h2>
-              <p className="text-sm text-muted-foreground">
-                {navigationData.lectures.length} {navigationData.lectures.length === 1 ? 'lecture' : 'lectures'}
-              </p>
-            </div>
-            
-            {/* Lectures List */}
-            <div className="flex-1 overflow-auto">
-              {navigationData.lectures.length === 0 ? (
-                <div className="p-4 text-center text-muted-foreground">
-                  No lectures available in this chapter.
+    <div className="flex flex-col w-full h-screen p-4 lg:p-6">
+      {/* Video player */}
+      <div className="mb-6">
+        <div className="aspect-video bg-zinc-950 rounded-lg overflow-hidden">
+          <VideoPlayerWithProgress 
+            videoUrl={videoUrl}
+            initialProgress={progress}
+            onProgressUpdate={handleProgressUpdate}
+            poster={lecture?.content?.data?.thumbnailUrl}
+          />
+        </div>
+      </div>
+      
+      {/* Navigation buttons */}
+      <div className="flex justify-between mb-6">
+        <Button
+          variant="outline"
+          onClick={navigateToPrevious}
+          disabled={!hasPrevious}
+        >
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Previous
+        </Button>
+        
+        <Button
+          variant="outline"
+          onClick={navigateToNext}
+          disabled={!hasNext}
+        >
+          Next
+          <ChevronRight className="h-4 w-4 ml-2" />
+        </Button>
+      </div>
+      
+      {/* Notes and Resources tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
+        <TabsList>
+          <TabsTrigger value="notes">
+            <BookOpen className="h-4 w-4 mr-2" />
+            Notes
+          </TabsTrigger>
+          <TabsTrigger value="resources">
+            <FileText className="h-4 w-4 mr-2" />
+            Resources
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="notes">
+          <Card>
+            <CardContent className="p-6">
+              {loadingNotes ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-sm text-muted-foreground mt-2">Loading notes...</p>
+                </div>
+              ) : notes.length > 0 ? (
+                <div className="space-y-4">
+                  {notes.map((note) => (
+                    <div key={note._id} className="border rounded-md p-4">
+                      <div className="flex justify-between mb-2">
+                        <p className="text-sm font-medium">
+                          {note.timestamp ? `Timestamp: ${note.timestamp}` : ''}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {note.createdAt ? formatDate(note.createdAt) : ''}
+                        </p>
+                      </div>
+                      <p className="text-sm">{note.content}</p>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <div className="p-2">
-                  {navigationData.lectures.map((lec, index) => {
-                    // Check different properties for completion status
-                    const isCompleted = 
-                      lec.completionStatus === 'completed' || 
-                      lec.status === 'completed' || 
-                      (lec.progress && lec.progress >= 100);
-                    
-                    const isInProgress = 
-                      lec.completionStatus === 'in_progress' || 
-                      lec.status === 'in_progress' || 
-                      (lec.progress && lec.progress > 0 && lec.progress < 100);
-                    
-                    const isCurrent = lec._id === lectureId;
-                    
-                    return (
-                      <div 
-                        key={lec._id || `lecture-${index}`}
-                        className={`p-3 mb-1 rounded-md cursor-pointer transition-colors flex items-start ${
-                          isCurrent 
-                            ? 'bg-primary/10 border-l-4 border-primary' 
-                            : 'hover:bg-accent border-l-4 border-transparent'
-                        }`}
-                        onClick={() => lec._id && handleNavigate(lec._id)}
-                      >
-                        <div className="flex-shrink-0 mt-0.5 mr-3">
-                          {isCompleted ? (
-                            <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                              <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                            </svg>
-                          ) : isInProgress ? (
-                            <svg className="h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <polyline points="12 6 12 12 16 14"></polyline>
-                            </svg>
-                          ) : (
-                            <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <line x1="12" y1="8" x2="12" y2="16"></line>
-                              <line x1="8" y1="12" x2="16" y2="12"></line>
-                            </svg>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">{lec.title}</div>
-                          {lec.duration && (
-                            <span className="text-xs text-muted-foreground">
-                              {typeof lec.duration === 'number' 
-                                ? `${Math.floor(lec.duration / 60)} min` 
-                                : lec.duration}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="text-center py-8">
+                  <BookOpen className="h-12 w-12 mx-auto text-muted-foreground opacity-20 mb-2" />
+                  <p className="text-muted-foreground">No notes available for this lecture.</p>
+                  <Button variant="outline" className="mt-4">
+                    Add Note
+                  </Button>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header with navigation controls */}
-        <div className="border-b py-2 px-4 flex items-center justify-between gap-4">
-          <div className="flex items-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="mr-2"
-              onClick={handleToggleSidebar}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-lg font-semibold line-clamp-1">{lecture.title}</h1>
-              <p className="text-sm text-muted-foreground">{navigationData.chapterTitle}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={navigateToPrevious}
-              disabled={!hasPrevious}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={navigateToNext}
-              disabled={!hasNext}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
         
-        {/* Main content section */}
-        <div className="flex-1 overflow-auto p-4 lg:p-6">
-          {/* Learning Reminder */}
-          <LearningReminder
-            progress={progress}
-            lastActive={lecture.lastAccessedAt ? new Date(lecture.lastAccessedAt).getTime() : undefined}
-            lectureType={lecture.content?.type}
-          />
-          
-          {/* Video player */}
-          <div className="mb-6">
-            <div className="aspect-video bg-zinc-950 rounded-lg overflow-hidden">
-              <VideoPlayerWithProgress 
-                videoUrl={videoUrl}
-                initialProgress={progress}
-                onProgressUpdate={handleProgressUpdate}
-                poster={lecture?.content?.data?.thumbnailUrl}
-              />
-            </div>
-          </div>
-          
-          {/* Lecture content */}
-          <Card className="mb-6">
+        <TabsContent value="resources">
+          <Card>
             <CardContent className="p-6">
-              <div className="flex gap-6 flex-col">
-                <div>
-                  <h2 className="text-xl font-semibold mb-4">{lecture.title}</h2>
-                  <div 
-                    className="prose prose-sm max-w-none" 
-                    dangerouslySetInnerHTML={{ 
-                      __html: lecture.description || lecture.content?.data?.content || '' 
-                    }}>
+              <div className="text-sm">
+                {lecture.resources && lecture.resources.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {lecture.resources.map((resource: any, index: number) => (
+                      <div key={index} className="border rounded-md p-4">
+                        <h3 className="font-medium mb-1">{resource.title}</h3>
+                        {resource.description && (
+                          <p className="text-muted-foreground text-sm mb-2">{resource.description}</p>
+                        )}
+                        <a 
+                          href={resource.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline text-sm flex items-center"
+                        >
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            className="h-4 w-4 mr-1" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              strokeWidth={2} 
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" 
+                            />
+                          </svg>
+                          View Resource
+                        </a>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground opacity-20 mb-2" />
+                    <p className="text-muted-foreground">No resources available for this lecture.</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
-          
-          {/* Notes and Resources tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList>
-              <TabsTrigger value="notes">
-                <BookOpen className="h-4 w-4 mr-2" />
-                Notes
-              </TabsTrigger>
-              <TabsTrigger value="resources">
-                <FileText className="h-4 w-4 mr-2" />
-                Resources
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="notes">
-              <Card>
-                <CardContent className="p-6">
-                  {loadingNotes ? (
-                    <div className="text-center py-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary mx-auto"></div>
-                      <p className="text-sm text-muted-foreground mt-2">Loading notes...</p>
-                    </div>
-                  ) : notes.length > 0 ? (
-                    <div className="space-y-4">
-                      {notes.map((note) => (
-                        <div key={note._id} className="border rounded-md p-4">
-                          <div className="flex justify-between mb-2">
-                            <p className="text-sm font-medium">
-                              {note.timestamp ? `Timestamp: ${note.timestamp}` : ''}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {note.createdAt ? formatDate(note.createdAt) : ''}
-                            </p>
-                          </div>
-                          <p className="text-sm">{note.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <BookOpen className="h-12 w-12 mx-auto text-muted-foreground opacity-20 mb-2" />
-                      <p className="text-muted-foreground">No notes available for this lecture.</p>
-                      <Button variant="outline" className="mt-4">
-                        Add Note
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="resources">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="text-sm">
-                    {lecture.resources && lecture.resources.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {lecture.resources.map((resource: any, index: number) => (
-                          <div key={index} className="border rounded-md p-4">
-                            <h3 className="font-medium mb-1">{resource.title}</h3>
-                            {resource.description && (
-                              <p className="text-muted-foreground text-sm mb-2">{resource.description}</p>
-                            )}
-                            <a 
-                              href={resource.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-primary hover:underline text-sm flex items-center"
-                            >
-                              <svg 
-                                xmlns="http://www.w3.org/2000/svg" 
-                                className="h-4 w-4 mr-1" 
-                                fill="none" 
-                                viewBox="0 0 24 24" 
-                                stroke="currentColor"
-                              >
-                                <path 
-                                  strokeLinecap="round" 
-                                  strokeLinejoin="round" 
-                                  strokeWidth={2} 
-                                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" 
-                                />
-                              </svg>
-                              View Resource
-                            </a>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <FileText className="h-12 w-12 mx-auto text-muted-foreground opacity-20 mb-2" />
-                        <p className="text-muted-foreground">No resources available for this lecture.</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-          
-          {/* Navigation buttons at bottom */}
-          <div className="flex justify-between mt-6">
-            <Button
-              variant="outline"
-              onClick={navigateToPrevious}
-              disabled={!hasPrevious}
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Previous Lecture
-            </Button>
-            
-            <StudyTimer 
-              lectureId={lectureId} 
-              position="inline"
-              onSessionEnd={(duration) => {
-                toast({
-                  title: "Study session completed",
-                  description: `You studied for ${Math.floor(duration / 60)} minutes.`,
-                });
-              }} 
-            />
-            
-            <Button
-              variant="default"
-              onClick={navigateToNext}
-              disabled={!hasNext}
-            >
-              Next Lecture
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
       
       {/* Floating study timer for non-mobile */}
       {!isMobile && (
@@ -579,29 +427,6 @@ export default function LecturePage() {
             });
           }} 
         />
-      )}
-      
-      {/* Mobile sidebar toggle button when sidebar is closed */}
-      {isMobile && !showSidebar && (
-        <button
-          onClick={handleToggleSidebar}
-          className="fixed bottom-4 right-4 bg-primary text-white rounded-full p-3 shadow-lg z-20"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16M4 18h16"
-            />
-          </svg>
-        </button>
       )}
     </div>
   );

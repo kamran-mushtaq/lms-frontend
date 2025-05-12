@@ -26,11 +26,13 @@ export default function VideoPlayerWithProgress({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [buffering, setBuffering] = useState(false);
-  const [lastReportedProgress, setLastReportedProgress] = useState(0);
+  const [progressUpdateQueue, setProgressUpdateQueue] = useState<{progress: number, time: number} | null>(null);
+  const [progressUpdateTimestamp, setProgressUpdateTimestamp] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const progressUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Set initial playback position based on progress
   useEffect(() => {
@@ -42,6 +44,16 @@ export default function VideoPlayerWithProgress({
       }
     }
   }, [duration, initialProgress]);
+
+  // Ensure audio is enabled
+  useEffect(() => {
+    if (videoRef.current) {
+      // Set volume explicitly
+      videoRef.current.volume = volume;
+      // Ensure not muted
+      videoRef.current.muted = false;
+    }
+  }, [volume]);
 
   // Auto-hide controls after inactivity
   useEffect(() => {
@@ -79,6 +91,35 @@ export default function VideoPlayerWithProgress({
     };
   }, [isPlaying]);
 
+  // Progress update with debounce
+  useEffect(() => {
+    if (!progressUpdateQueue) return;
+    
+    // Only update if it's been at least 3 seconds since the last update
+    const now = Date.now();
+    if (now - progressUpdateTimestamp < 3000) {
+      return;
+    }
+    
+    if (progressUpdateTimeoutRef.current) {
+      clearTimeout(progressUpdateTimeoutRef.current);
+    }
+    
+    progressUpdateTimeoutRef.current = setTimeout(() => {
+      if (progressUpdateQueue && onProgressUpdate) {
+        onProgressUpdate(progressUpdateQueue.progress, progressUpdateQueue.time);
+        setProgressUpdateTimestamp(now);
+        setProgressUpdateQueue(null);
+      }
+    }, 500);
+    
+    return () => {
+      if (progressUpdateTimeoutRef.current) {
+        clearTimeout(progressUpdateTimeoutRef.current);
+      }
+    };
+  }, [progressUpdateQueue, onProgressUpdate, progressUpdateTimestamp]);
+
   // Format time in MM:SS format
   const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60);
@@ -92,6 +133,10 @@ export default function VideoPlayerWithProgress({
       if (isPlaying) {
         videoRef.current.pause();
       } else {
+        // Ensure not muted before playing
+        videoRef.current.muted = false;
+        setIsMuted(false);
+        
         videoRef.current.play().catch(err => {
           console.error('Error playing video:', err);
         });
@@ -105,8 +150,9 @@ export default function VideoPlayerWithProgress({
     setVolume(newVolume);
     if (videoRef.current) {
       videoRef.current.volume = newVolume;
+      videoRef.current.muted = newVolume === 0;
+      setIsMuted(newVolume === 0);
     }
-    setIsMuted(newVolume === 0);
   };
 
   // Handle mute toggle
@@ -171,14 +217,15 @@ export default function VideoPlayerWithProgress({
       setCurrentTime(newCurrentTime);
       
       // Calculate progress percentage
-      const progressPercent = (newCurrentTime / duration) * 100;
-      
-      // Report progress to parent component if it changed significantly (every 5%)
-      if (progressPercent > lastReportedProgress + 5 || progressPercent >= 99) {
-        if (onProgressUpdate) {
-          onProgressUpdate(progressPercent, newCurrentTime);
-          setLastReportedProgress(progressPercent);
-        }
+      if (duration > 0) {
+        const progressPercent = Math.min(100, Math.round((newCurrentTime / duration) * 100));
+        
+        // Queue the progress update instead of immediately calling the function
+        // This will allow us to debounce the updates
+        setProgressUpdateQueue({
+          progress: progressPercent,
+          time: newCurrentTime
+        });
       }
     }
   };
@@ -196,6 +243,11 @@ export default function VideoPlayerWithProgress({
   const handleMetadataLoaded = () => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
+      // Set volume explicitly
+      videoRef.current.volume = volume;
+      // Ensure not muted when metadata is loaded
+      videoRef.current.muted = false;
+      setIsMuted(false);
     }
   };
 
@@ -218,6 +270,20 @@ export default function VideoPlayerWithProgress({
 
   const handleCanPlay = () => {
     setBuffering(false);
+    // Once video can play, ensure volume settings are applied
+    if (videoRef.current) {
+      videoRef.current.volume = volume;
+      videoRef.current.muted = false;
+    }
+  };
+
+  // Fix for iOS devices that may have issues with autoplay and audio
+  const handleUserInteraction = () => {
+    if (videoRef.current) {
+      // Unmute on user interaction
+      videoRef.current.muted = false;
+      setIsMuted(false);
+    }
   };
 
   return (
@@ -225,6 +291,7 @@ export default function VideoPlayerWithProgress({
       ref={containerRef} 
       className="relative w-full h-full bg-black overflow-hidden"
       onMouseMove={() => setShowControls(true)}
+      onClick={handleUserInteraction}
     >
       <video
         ref={videoRef}
@@ -238,7 +305,11 @@ export default function VideoPlayerWithProgress({
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onEnded={handleVideoEnded}
-        onClick={togglePlay}
+        onClick={(e) => {
+          e.stopPropagation();
+          togglePlay();
+        }}
+        playsInline
       />
 
       {/* Buffering indicator */}
@@ -248,8 +319,27 @@ export default function VideoPlayerWithProgress({
         </div>
       )}
 
+      {/* Play button overlay when paused */}
+      {!isPlaying && !buffering && (
+        <div 
+          className="absolute inset-0 flex items-center justify-center cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            togglePlay();
+          }}
+        >
+          <div className="h-20 w-20 bg-black/60 rounded-full flex items-center justify-center">
+            <Play className="h-10 w-10 text-white" />
+          </div>
+        </div>
+      )}
+
       {/* Video controls - fade in/out based on showControls state */}
-      <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 transition-opacity ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+      <div 
+        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 transition-opacity duration-300 ${
+          showControls ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
         <div className="flex flex-col gap-2">
           {/* Progress bar */}
           <div className="w-full">
@@ -306,7 +396,7 @@ export default function VideoPlayerWithProgress({
                     value={[isMuted ? 0 : volume]}
                     min={0}
                     max={1}
-                    step={0.01}
+                    step={0.05}
                     onValueChange={handleVolumeChange}
                     className="h-1.5 cursor-pointer"
                   />

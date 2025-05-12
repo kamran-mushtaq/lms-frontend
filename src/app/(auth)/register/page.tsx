@@ -272,6 +272,17 @@ export default function RegistrationPage() {
         { key: "classId", value: data.classId },
         { key: "parentId", value: userId }, // Link to parent
       ]);
+      
+      // Create guardian-student relationship
+    await createGuardianStudentRelationship({
+      guardianId: userId,
+      studentId: response.user._id,
+      relationship: "parent", // or use data.relationship if selectable
+      isPrimary: true,
+      permissionLevel: "full", // or adjust as needed
+      isActive: true,
+      metadata: {}, // or include any additional info
+    });
 
       // Enroll student in selected subjects
       const subjectIds = data.subjects.map(subject => subject.id);
@@ -287,6 +298,19 @@ export default function RegistrationPage() {
     }
   };
 
+  const createGuardianStudentRelationship = async (payload: {
+    guardianId: string;
+    studentId: string;
+    relationship: string;
+    isPrimary: boolean;
+    permissionLevel: string;
+    isActive: boolean;
+    metadata: Record<string, any>;
+  }) => {
+    return await axios.post("/api/guardian-student", payload);
+  };
+
+  
   // Handle additional details submission
   const handleAdditionalDetails = async (data: z.infer<typeof additionalSchema>) => {
     setIsLoading(true);

@@ -74,172 +74,82 @@ export const getLectureById = async (id: string): Promise<Lecture> => {
 export const getLectureDetails = async (id: string) => {
   try {
     console.log(`Fetching lecture details from: /lectures/${id}/details`);
-    const response = await apiClient.get(`/lectures/${id}/details`);
-    console.log('Lecture details response:', response.data);
-    
-    // Add a special check to see if the lecture has the expected structure
-    // If not, we should try to fetch resources and transcript separately
-    const lectureData = response.data;
-    
-    // If we're missing resources or transcript, we should fetch them
-    if (!lectureData.resources || !Array.isArray(lectureData.resources) || lectureData.resources.length === 0) {
-      console.log('Resources not included in lecture details, fetching separately');
-      try {
-        const resourcesResponse = await getLectureResources(id);
-        if (resourcesResponse && resourcesResponse.resources) {
-          lectureData.resources = resourcesResponse.resources;
-        } else if (resourcesResponse && Array.isArray(resourcesResponse)) {
-          // Handle case where API returns array directly
-          lectureData.resources = resourcesResponse;
-        } else if (resourcesResponse && resourcesResponse.lecture_resources) {
-          // Handle alternative naming
-          lectureData.resources = resourcesResponse.lecture_resources;
-        }
-      } catch (resourcesError) {
-        console.error('Error fetching additional resources:', resourcesError);
-      }
-    } else {
-      console.log('Resources found in lecture details:', lectureData.resources.length, 'items');
-    }
-    
-    // If transcript is missing, fetch it separately
-    if (!lectureData.transcript || !Array.isArray(lectureData.transcript) || lectureData.transcript.length === 0) {
-      console.log('Transcript not included in lecture details, fetching separately');
-      try {
-        const transcriptResponse = await getLectureTranscript(id);
-        if (transcriptResponse && transcriptResponse.transcript && Array.isArray(transcriptResponse.transcript)) {
-          lectureData.transcript = transcriptResponse.transcript;
-          console.log('Added transcript to lecture data:', transcriptResponse.transcript.length, 'items');
-        } else if (transcriptResponse && Array.isArray(transcriptResponse)) {
-          // Handle case where API returns array directly
-          lectureData.transcript = transcriptResponse;
-          console.log('Added transcript (direct array) to lecture data:', transcriptResponse.length, 'items');
-        }
-      } catch (transcriptError) {
-        console.error('Error fetching additional transcript:', transcriptError);
-      }
-    } else {
-      console.log('Transcript found in lecture details:', lectureData.transcript.length, 'items');
-    }
-    
-    // If chapter lectures are missing and we have a chapterId, fetch them
-    if ((!lectureData.chapterLectures || !Array.isArray(lectureData.chapterLectures) || lectureData.chapterLectures.length === 0) && lectureData.chapterId) {
-      console.log('Chapter lectures not included, fetching separately');
-      try {
-        const chapterId = typeof lectureData.chapterId === 'string' ? lectureData.chapterId : 
-                        (lectureData.chapterId && typeof lectureData.chapterId === 'object' && lectureData.chapterId._id ? 
-                         lectureData.chapterId._id : null);
-        
-        if (chapterId) {
-          const chaptersResponse = await getLecturesByChapter(chapterId);
-          
-          // Handle different response formats
-          if (chaptersResponse && chaptersResponse.lectures && Array.isArray(chaptersResponse.lectures)) {
-            lectureData.chapterLectures = chaptersResponse.lectures;
-            console.log('Set chapter lectures from chaptersResponse.lectures:', chaptersResponse.lectures.length, 'items');
-          } else if (chaptersResponse && Array.isArray(chaptersResponse)) {
-            lectureData.chapterLectures = chaptersResponse;
-            console.log('Set chapter lectures from direct array:', chaptersResponse.length, 'items');
-          }
-          
-          // If chapter title is missing, add it from the response
-          if (!lectureData.chapterTitle && chaptersResponse.chapterTitle) {
-            lectureData.chapterTitle = chaptersResponse.chapterTitle;
-            console.log('Added chapter title from response:', chaptersResponse.chapterTitle);
-          }
-        }
-      } catch (chaptersError) {
-        console.error('Error fetching chapter lectures:', chaptersError);
-      }
-    } else if (lectureData.lectures && Array.isArray(lectureData.lectures) && lectureData.lectures.length > 0) {
-      // If lectures are available in alternative field
-      console.log('Using lectures field instead of chapterLectures');
-      lectureData.chapterLectures = lectureData.lectures;
-    } else if (lectureData.chapterLectures) {
-      console.log('Chapter lectures found in lecture details:', lectureData.chapterLectures.length, 'items');
-    }
-    
-    return lectureData;
-  } catch (error: any) {
-    console.error('Error fetching lecture details:', error);
-    
-    // Try fallback to basic lecture info if /details endpoint fails
     try {
+      const response = await apiClient.get(`/lectures/${id}/details`);
+      console.log('Lecture details response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching lecture details:', error);
+      
+      // Try fallback to basic lecture info if /details endpoint fails
       console.log(`Falling back to basic lecture info: /lectures/${id}`);
       const basicResponse = await apiClient.get(`/lectures/${id}`);
       console.log('Basic lecture response:', basicResponse.data);
       
-      const basicLectureData = basicResponse.data;
+      const lectureData = basicResponse.data;
       
-      // Fetch resources, transcript and chapter lectures separately
-      // Resources
+      // Get chapter ID from the lecture
+      const chapterId = lectureData.chapterId || 
+                       (lectureData.chapter && lectureData.chapter._id) || 
+                       (typeof lectureData.chapter === 'string' ? lectureData.chapter : '');
+      
+      if (chapterId) {
+        // Fetch chapter data to get chapter title and lectures
+        try {
+          console.log(`Fetching chapter data for: ${chapterId}`);
+          const chapterResponse = await apiClient.get(`/chapters/${chapterId}`);
+          console.log('Chapter data response:', chapterResponse.data);
+          
+          if (chapterResponse.data) {
+            lectureData.chapterTitle = chapterResponse.data.title || '';
+            lectureData.chapterLectures = chapterResponse.data.lectures || [];
+          }
+        } catch (chapterError) {
+          console.error('Error fetching chapter data:', chapterError);
+        }
+      }
+      
+      // Fetch lecture resources
       try {
-        const resourcesResponse = await getLectureResources(id);
-        if (resourcesResponse && resourcesResponse.resources) {
-          basicLectureData.resources = resourcesResponse.resources;
+        console.log(`Fetching resources for lecture: ${id}`);
+        const resourcesResponse = await apiClient.get(`/lectures/${id}/resources`);
+        console.log('Resources response:', resourcesResponse.data);
+        
+        if (resourcesResponse.data) {
+          if (Array.isArray(resourcesResponse.data)) {
+            lectureData.resources = resourcesResponse.data;
+          } else if (resourcesResponse.data.resources) {
+            lectureData.resources = resourcesResponse.data.resources;
+          }
         }
       } catch (resourcesError) {
-        console.error('Error fetching resources for fallback:', resourcesError);
-        basicLectureData.resources = [];
+        console.error('Error fetching resources:', resourcesError);
+        lectureData.resources = [];
       }
       
-      // Transcript
+      // Fetch lecture transcript
       try {
-        const transcriptResponse = await getLectureTranscript(id);
-        if (transcriptResponse && transcriptResponse.transcript) {
-          basicLectureData.transcript = transcriptResponse.transcript;
+        console.log(`Fetching transcript for lecture: ${id}`);
+        const transcriptResponse = await apiClient.get(`/lectures/${id}/transcript`);
+        console.log('Transcript response:', transcriptResponse.data);
+        
+        if (transcriptResponse.data) {
+          if (Array.isArray(transcriptResponse.data)) {
+            lectureData.transcript = transcriptResponse.data;
+          } else if (transcriptResponse.data.transcript) {
+            lectureData.transcript = transcriptResponse.data.transcript;
+          }
         }
       } catch (transcriptError) {
-        console.error('Error fetching transcript for fallback:', transcriptError);
-        basicLectureData.transcript = [];
+        console.error('Error fetching transcript:', transcriptError);
+        lectureData.transcript = [];
       }
       
-      // Chapter lectures
-      if (basicLectureData.chapterId) {
-        try {
-          const chapterId = typeof basicLectureData.chapterId === 'string' ? basicLectureData.chapterId : 
-                          (basicLectureData.chapterId && typeof basicLectureData.chapterId === 'object' && basicLectureData.chapterId._id ? 
-                           basicLectureData.chapterId._id : null);
-          
-          if (chapterId) {
-            const chaptersResponse = await getLecturesByChapter(chapterId);
-            if (chaptersResponse && chaptersResponse.lectures) {
-              basicLectureData.chapterLectures = chaptersResponse.lectures;
-              // If chapter title is missing, add it from the response
-              if (!basicLectureData.chapterTitle && chaptersResponse.chapterTitle) {
-                basicLectureData.chapterTitle = chaptersResponse.chapterTitle;
-              }
-            }
-          }
-        } catch (chaptersError) {
-          console.error('Error fetching chapter lectures for fallback:', chaptersError);
-          basicLectureData.chapterLectures = [];
-        }
-      }
-      
-      return basicLectureData;
-    } catch (fallbackError) {
-      console.error('Fallback fetching also failed:', fallbackError);
-      
-      // Enhanced error handling with more specific messages
-      if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        if (error.response.status === 404) {
-          throw new Error(`Lecture with ID ${id} not found. This lecture may have been deleted.`);
-        } else if (error.response.status === 401) {
-          throw new Error('Authentication failed. Please log in again.');
-        } else {
-          throw new Error(`Server error (${error.response.status}): ${error.response.data?.message || 'Unknown error'}`);
-        }
-      } else if (error.request) {
-        // The request was made but no response was received
-        throw new Error('No response from server. Please check your network connection.');
-      } else {
-        // Something happened in setting up the request that triggered an Error
-        throw new Error(`Error creating request: ${error.message}`);
-      }
+      return lectureData;
     }
+  } catch (error: any) {
+    console.error('Error in getLectureDetails:', error);
+    throw error;
   }
 };
 
@@ -342,11 +252,38 @@ export const getLectureResources = async (id: string) => {
 /**
  * Get all lectures for a chapter
  */
-export const getLecturesByChapter = async (chapterId: string): Promise<NavigationData> => {
+export const getLecturesByChapter = async (chapterId: string): Promise<any> => {
   try {
-    console.log(`Fetching lectures by chapter: /lectures/byChapter/${chapterId}`);
-    const response = await apiClient.get(`/lectures/byChapter/${chapterId}`);
-    console.log('Lectures by chapter response:', response.data);
+    console.log(`Fetching lectures for chapter: ${chapterId}`);
+    let response;
+    try {
+      // Try the chapters/:id endpoint first
+      response = await apiClient.get(`/chapters/${chapterId}`);
+      console.log('Chapter data response:', response.data);
+      
+      // If successful, return the lectures array from the chapter data
+      if (response.data && response.data.lectures) {
+        return {
+          chapterTitle: response.data.title,
+          lectures: response.data.lectures
+        };
+      }
+    } catch (firstError) {
+      console.log(`First endpoint attempt failed, trying alternative endpoints`);
+      // Try lecture endpoints
+      try {
+        response = await apiClient.get(`/lectures/byChapter/${chapterId}`);
+        console.log('Lectures by chapter response:', response.data);
+        return {
+          lectures: response.data
+        };
+      } catch (secondError) {
+        console.log('Second endpoint failed, trying chapters/:id/lectures endpoint');
+        response = await apiClient.get(`/chapters/${chapterId}/lectures`);
+        console.log('Chapter lectures response:', response.data);
+        return response.data;
+      }
+    }
     return response.data;
   } catch (error: any) {
     console.error('Error fetching lectures by chapter:', error);
@@ -375,8 +312,32 @@ export const getLecturesByChapter = async (chapterId: string): Promise<Navigatio
 /**
  * Update lecture progress
  */
+// Store last progress update time and values to avoid excessive API calls
+const lastProgressUpdate = {
+  timestamp: 0,
+  lectureId: '',
+  progress: 0,
+  currentTime: 0
+};
+
 export const updateLectureProgress = async (id: string, progressData: ProgressData) => {
   try {
+    // Implement throttling - only update progress every 10 seconds at most
+    // and only if progress has increased by at least 2%
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastProgressUpdate.timestamp;
+    const progressDifference = (progressData.progress || 0) - lastProgressUpdate.progress;
+    
+    const isSignificantProgressChange = progressDifference >= 2 || 
+                                        (progressData.progress || 0) >= 99;
+    const isTimeToUpdate = timeSinceLastUpdate >= 10000 || 
+                          (progressData.progress || 0) >= 99;
+    const isDifferentLecture = id !== lastProgressUpdate.lectureId;
+    
+    if (!isSignificantProgressChange && !isTimeToUpdate && !isDifferentLecture) {
+      return null; // Skip API call if not needed
+    }
+    
     // Get user info from localStorage
     let studentId = '';
     try {
@@ -396,31 +357,53 @@ export const updateLectureProgress = async (id: string, progressData: ProgressDa
     }
     
     // Format the request according to the API expectations
-    // Using format from working use-student-progress.ts
     const payload = {
-      resourceId: id, // Explicitly include the resource ID in the payload
-      resourceType: 'lecture', // Specify that this is a lecture resource
+      resourceId: id,
+      resourceType: 'lecture',
       progressPercentage: progressData.progress || 0,
+      currentTime: progressData.currentTime || 0,
       timeSpentMinutes: Math.floor((progressData.currentTime || 0) / 60),
       status: progressData.progress >= 90 ? "completed" : "in_progress",
       lastAccessedAt: new Date().toISOString()
     };
     
-    // Try both endpoint formats to match what's implemented in the API
+    // Update last progress values
+    lastProgressUpdate.timestamp = now;
+    lastProgressUpdate.lectureId = id;
+    lastProgressUpdate.progress = progressData.progress || 0;
+    lastProgressUpdate.currentTime = progressData.currentTime || 0;
+    
+    // Try the correct endpoint format based on your API
     try {
-      console.log(`Trying to update progress with endpoint: /student-progress/${studentId}`);
-      const response = await apiClient.post(`/student-progress/${studentId}`, payload);
-      console.log('Progress update successful with first endpoint');
+      console.log(`Updating progress: ${progressData.progress}% at ${Math.floor((progressData.currentTime || 0))} seconds`);
+      // This is the correct endpoint based on your controller
+      const response = await apiClient.put(`/student-progress/${studentId}/resource/${id}?type=lecture`, payload);
       return response.data;
     } catch (firstError) {
-      console.log('First endpoint attempt failed, trying alternative endpoint');
-      // If the first attempt fails, try the alternate endpoint format
-      const response = await apiClient.put(`/students/${studentId}/progress`, {
-        resourceId: id,
-        ...payload
-      });
-      console.log('Progress update successful with second endpoint');
-      return response.data;
+      console.log('First endpoint attempt failed, trying alternative endpoints');
+      try {
+        // Try direct endpoint
+        const response = await apiClient.post(`/lectures/${id}/progress`, {
+          studentId,
+          progress: {
+            currentTimestamp: progressData.currentTime || 0,
+            percentageComplete: progressData.progress || 0
+          }
+        });
+        return response.data;
+      } catch (secondError) {
+        // Fallback to the original endpoints
+        try {
+          const response = await apiClient.post(`/student-progress/${studentId}`, payload);
+          return response.data;
+        } catch (thirdError) {
+          const response = await apiClient.put(`/students/${studentId}/progress`, {
+            resourceId: id,
+            ...payload
+          });
+          return response.data;
+        }
+      }
     }
   } catch (error: any) {
     console.error('Error updating lecture progress:', error);
