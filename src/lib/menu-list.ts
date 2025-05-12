@@ -153,12 +153,12 @@ export function getMenuList(pathname: string): Group[] {
     {
       groupLabel: "System Settings",
       menus: [
-        {
-          href: "#",
-          label: "Notifications",
-          icon: Bell,
-          submenus: []
-        },
+        // {
+        //   href: "#",
+        //   label: "Notifications",
+        //   icon: Bell,
+        //   submenus: []
+        // },
         // {
         //   href: "/manage/feature-flags",
         //   label: "Feature Flags",
@@ -166,17 +166,17 @@ export function getMenuList(pathname: string): Group[] {
         //   submenus: []
         // },
         {
-          href: "#",
+          href: "/admin/settings",
           label: "Settings",
           icon: Settings,
           submenus: []
         },
-        {
-          href: "#",
-          label: "Payments",
-          icon: Settings,
-          submenus: []
-        }
+        // {
+        //   href: "#",
+        //   label: "Payments",
+        //   icon: Settings,
+        //   submenus: []
+        // }
       ]
     }
   ];
