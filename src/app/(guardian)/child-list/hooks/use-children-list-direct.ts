@@ -26,15 +26,27 @@ export function useChildrenList(parentId: string): UseChildrenListResult {
       
       console.log('Fetching children for guardian:', parentId);
       
-      const response = await apiClient.get(
-        `/guardian-student/guardian/${parentId}`
-      );
+      const fetchChildren = async (parentId: string) => {
+        try {
+          const response = await apiClient.get(
+            `/guardian-student/guardian/${parentId}`
+          );
 
-      if (!response.ok) {
-        const errorText = await response;
-       
-        throw new Error(`API Error: ${response.status}`);
-      }
+          if (!response.ok) {
+            // For non-2xx responses
+            const errorData = await response.json(); // Assuming the error is in JSON format
+            console.error("API Error Response:", errorData);
+            throw new Error(
+              `API Error: ${response.status} - ${JSON.stringify(errorData)}`
+            );
+          }
+
+          return await response.json(); // Parse successful response
+        } catch (error) {
+          console.error("Failed to fetch children:", error);
+          throw error; // Re-throw to let the calling code handle it
+        }
+      };
       
       const data: GuardianStudentResponse = await response.data;
       console.log('Fetched data:', data);
