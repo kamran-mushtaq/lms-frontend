@@ -21,7 +21,7 @@ type User = {
   _id: string;
   name: string;
   email: string;
-  type: "student" | "parent" | "teacher" | "admin";
+  type: "student" | "guardian" | "teacher" | "admin";
   isVerified: boolean;
   classId?: string; // Added classId for student users
   aptitudeTestStatus?: AptitudeTestStatus;
@@ -35,8 +35,8 @@ export type AuthContextType = {
   logout: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<boolean>;
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
-  registerParent: (
-    data: ParentRegistrationData
+  registerguardian: (
+    data: guardianRegistrationData
   ) => Promise<{ userId: string; message: string }>;
   verifyOtp: (userId: string, otp: string) => Promise<boolean>;
   registerStudent: (
@@ -49,7 +49,7 @@ export type AuthContextType = {
   isUserVerified: boolean;
 };
 
-type ParentRegistrationData = {
+type guardianRegistrationData = {
   name: string;
   email: string;
   password: string;
@@ -325,15 +325,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         case "teacher":
           redirectPath = "/teacher/dashboard";
           break;
-        case "parent":
-          // Check if parent needs OTP verification (though this might be handled elsewhere now)
+        case "guardian":
+          // Check if guardian needs OTP verification (though this might be handled elsewhere now)
           if (!userWithStatus.isVerified) {
              // Redirect to OTP page if not verified
              // Note: The verifyOtp function also handles login after verification.
              // Consider if direct login after OTP is always desired.
              redirectPath = `/verify-otp?userId=${userWithStatus._id}`;
           } else {
-             redirectPath = "/parent/dashboard";
+             redirectPath = "/guardian/dashboard";
           }
           break;
         case "student":
@@ -508,19 +508,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Register a new parent account
-  const registerParent = async (
-    data: ParentRegistrationData
+  // Register a new guardian account
+  const registerguardian = async (
+    data: guardianRegistrationData
   ): Promise<{ userId: string; message: string }> => {
     setIsLoading(true);
     try {
-      // Create new parent user
+      // Create new guardian user
       const response = await axios.post(`${API_URL}/users/register`, {
         name: data.name,
         email: data.email,
         password: data.password || "123456789", // Use provided password or default
-        type: "parent",
-        roleId: "679cd2ec2b0f000ac3e9a147" // Parent role ID
+        type: "guardian",
+        roleId: "679cd2ec2b0f000ac3e9a147" // guardian role ID
       });
 
       if (!response.data?.user?._id) {
@@ -545,9 +545,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           "Registration successful! Please verify your email with the OTP sent."
       };
     } catch (error: any) {
-      console.error("Parent registration error:", error);
+      console.error("guardian registration error:", error);
       throw new Error(
-        error.response?.data?.message || "Failed to register parent account"
+        error.response?.data?.message || "Failed to register guardian account"
       );
     } finally {
       setIsLoading(false);
@@ -623,8 +623,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ): Promise<{ success: boolean; message: string }> => {
     setIsLoading(true);
     try {
-      if (!user || user.type !== "parent") {
-        throw new Error("Only parents can register students");
+      if (!user || user.type !== "guardian") {
+        throw new Error("Only guardians can register students");
       }
 
       // Create student user with the provided class ID
@@ -657,7 +657,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           { key: "dob", value: data.dob.toISOString() },
           { key: "gender", value: data.gender },
           { key: "classId", value: data.classId },
-          { key: "parentId", value: user._id }
+          { key: "guardianId", value: user._id }
         ]
       });
 
@@ -756,7 +756,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         requestPasswordReset,
         resetPassword,
-        registerParent,
+        registerguardian,
         verifyOtp,
         registerStudent,
         checkAptitudeTestStatus,

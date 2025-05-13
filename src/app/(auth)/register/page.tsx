@@ -30,14 +30,15 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, ChevronRight, ChevronLeft, ArrowRight } from "lucide-react";
+import { Loader2, CheckCircle2, ChevronRight, ChevronLeft, ArrowRight, Moon, Sun } from "lucide-react";
 import { registerUser, verifyOtp, resendOtp } from "@/lib/auth-api";
 import { createProfile } from "@/lib/profile-api";
 import { enrollStudent } from "@/lib/enrollment-api";
 import { useClasses, useSubjects } from "@/hooks/use-classes";
 import OtpInput from "./components/otp-input";
-import { Country, City } from "country-state-city"; // Added
-import { ICountry, ICity } from "country-state-city"; // Added
+import { Country, City } from "country-state-city";
+import { ICountry, ICity } from "country-state-city";
+import axios from "axios";
 
 // Define parent registration schema
 const parentSchema = z.object({
@@ -102,7 +103,38 @@ export default function RegistrationPage() {
   // Removed old country/city state
   const [fetchedCountries, setFetchedCountries] = useState<ICountry[]>([]); // Added
   const [fetchedCities, setFetchedCities] = useState<ICity[]>([]); // Added
-  const [selectedCountryIsoCode, setSelectedCountryIsoCode] = useState<string>(""); // Added
+  const [selectedCountryIsoCode, setSelectedCountryIsoCode] = useState<string>("");
+  
+  // Dark mode state
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Initialize dark mode from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (savedTheme === null && prefersDark)) {
+      setDarkMode(true);
+      document.documentElement.classList.add('dark');
+    } else {
+      setDarkMode(false);
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   // Use our hooks to fetch class and subject data
   const { classes, isLoading: classesLoading } = useClasses();
@@ -193,7 +225,7 @@ export default function RegistrationPage() {
         email: data.email,
         password: data.password,
         type: "parent",
-        roleId: "679cd2ec2b0f000ac3e9a147", // Replace with actual parent role ID
+        roleId: "682259f2b50bb66127b715e4", // Replace with actual parent role ID
       });
 
       await createProfile(response.user._id, [
@@ -253,13 +285,21 @@ export default function RegistrationPage() {
   const handleStudentRegistration = async (data: z.infer<typeof studentSchema>) => {
     setIsLoading(true);
     try {
+      // Check if student email is same as parent email
+      const parentEmail = parentForm.getValues("email");
+      if (data.email === parentEmail) {
+        toast.error("Student email cannot be the same as parent email. Please use a different email.");
+        setIsLoading(false);
+        return;
+      }
+
       // Register student
       const response = await registerUser({
         name: data.name,
         email: data.email,
         password: data.password,
         type: "student",
-        roleId: "679cd2e82b0f000ac3e9a145", // Replace with actual student role ID
+        roleId: "682259f2b50bb66127b715e2", // Replace with actual student role ID
         isVerified: true, // Auto-verify the student
       });
       
@@ -274,15 +314,16 @@ export default function RegistrationPage() {
       ]);
       
       // Create guardian-student relationship
-    await createGuardianStudentRelationship({
-      guardianId: userId,
-      studentId: response.user._id,
-      relationship: "parent", // or use data.relationship if selectable
-      isPrimary: true,
-      permissionLevel: "full", // or adjust as needed
-      isActive: true,
-      metadata: {}, // or include any additional info
-    });
+      // TODO: Implement this when the backend API is ready
+      await createGuardianStudentRelationship({
+        guardianId: userId,
+        studentId: response.user._id,
+        relationship: "parent",
+        isPrimary: true,
+        permissionLevel: "full",
+        isActive: true,
+        metadata: {},
+      });
 
       // Enroll student in selected subjects
       const subjectIds = data.subjects.map(subject => subject.id);
@@ -298,6 +339,7 @@ export default function RegistrationPage() {
     }
   };
 
+  // TODO: Remove this function when backend API is ready
   const createGuardianStudentRelationship = async (payload: {
     guardianId: string;
     studentId: string;
@@ -307,9 +349,18 @@ export default function RegistrationPage() {
     isActive: boolean;
     metadata: Record<string, any>;
   }) => {
-    return await axios.post("/api/guardian-student", payload);
-  };
+    console.log("Sending payload:", payload);
 
+    try {
+      const response = await axios.post("/api/guardian-student", payload);
+      console.log("API response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("API error:", error);
+      throw error;
+    }
+  };
+  
   
   // Handle additional details submission
   const handleAdditionalDetails = async (data: z.infer<typeof additionalSchema>) => {
@@ -379,29 +430,29 @@ export default function RegistrationPage() {
   // Render completion step
   if (currentStep === RegistrationStep.Complete) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900">
         <div className="max-w-md w-full mx-auto">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="bg-white p-8 rounded-lg shadow-xl text-center"
+            className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center"
           >
             <div className="flex justify-center mb-6">
-              <div className="rounded-full bg-green-100 p-3">
-                <CheckCircle2 className="h-12 w-12 text-green-600" />
+              <div className="rounded-full bg-green-100 dark:bg-green-900 p-3">
+                <CheckCircle2 className="h-12 w-12 text-green-600 dark:text-green-400" />
               </div>
             </div>
             
-            <h1 className="text-2xl font-bold mb-4">Registration Complete!</h1>
-            <p className="text-gray-600 mb-8">
+            <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Registration Complete!</h1>
+            <p className="text-gray-600 dark:text-gray-300 mb-8">
               Thank you for registering! You will be redirected to the login page in a few seconds.
             </p>
             
             <Button 
               size="lg"
               onClick={() => router.push("/login")}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
               Go to Login
             </Button>
@@ -412,31 +463,47 @@ export default function RegistrationPage() {
   }
 
   return (
-    <div className=" min-h-screen">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+      {/* Theme toggle button */}
+      <div className="fixed top-4 right-4 z-50">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={toggleDarkMode}
+          className="bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          {darkMode ? (
+            <Sun className="h-4 w-4 text-yellow-500" />
+          ) : (
+            <Moon className="h-4 w-4 text-gray-700" />
+          )}
+        </Button>
+      </div>
+
       {/* Progress bar */}
-      <div className="fixed top-0 left-0 w-full h-1 bg-gray-200 z-50">
+      <div className="fixed top-0 left-0 w-full h-1 bg-gray-200 dark:bg-gray-700 z-50">
         <div 
-          className="h-full bg-blue-600 transition-all duration-300 ease-in-out"
+          className="h-full bg-blue-600 dark:bg-blue-500 transition-all duration-300 ease-in-out"
           style={{ width: `${progressPercentage}%` }}
         ></div>
       </div>
       
       <div className="flex min-h-screen">
-        <div className="w-full lg:w-1/2 bg-white">
+        <div className="w-full lg:w-1/2 bg-white dark:bg-gray-800 transition-colors duration-200">
           <div className="max-w-2xl mx-auto p-6 sm:p-10 lg:p-12">
             <div className="mb-8">
-              <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider">Step {currentStep + 1} of 4</h3>
+              <h3 className="text-sm font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Step {currentStep + 1} of 4</h3>
               {currentStep === RegistrationStep.ParentDetails && (
-                <h2 className="text-3xl font-bold mt-2">Parent Registration</h2>
+                <h2 className="text-3xl font-bold mt-2 text-gray-900 dark:text-white">Parent Registration</h2>
               )}
               {currentStep === RegistrationStep.OtpVerification && (
-                <h2 className="text-3xl font-bold mt-2">Verify Email</h2>
+                <h2 className="text-3xl font-bold mt-2 text-gray-900 dark:text-white">Verify Email</h2>
               )}
               {currentStep === RegistrationStep.StudentDetails && (
-                <h2 className="text-3xl font-bold mt-2">Student Details</h2>
+                <h2 className="text-3xl font-bold mt-2 text-gray-900 dark:text-white">Student Details</h2>
               )}
               {currentStep === RegistrationStep.AdditionalDetails && (
-                <h2 className="text-3xl font-bold mt-2">Additional Information</h2>
+                <h2 className="text-3xl font-bold mt-2 text-gray-900 dark:text-white">Additional Information</h2>
               )}
             </div>
 
@@ -622,7 +689,7 @@ export default function RegistrationPage() {
                       <div className="pt-4">
                         <Button
                           type="submit"
-                          className="w-full bg-blue-600 hover:bg-blue-700"
+                          className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                           disabled={isLoading}
                         >
                           {isLoading ? (
@@ -646,7 +713,7 @@ export default function RegistrationPage() {
                 {currentStep === RegistrationStep.OtpVerification && (
                   <Form {...otpForm}>
                     <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-6">
-                      <div className="text-gray-600 mb-6">
+                      <div className="text-gray-600 dark:text-gray-300 mb-6">
                         <p>We've sent a verification code to your email address. Please enter the 5-digit code below.</p>
                       </div>
 
@@ -695,8 +762,7 @@ export default function RegistrationPage() {
 
                         <Button
                           type="submit"
-                          className="flex-1 bg-blue-600 hover:bg-blue-700"
-                          // Fix: Watch form field value instead of using getValues() which doesn't update reactively
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                           disabled={!otpForm.watch("otp") || otpForm.watch("otp").length !== 5 || isLoading}
                         >
                           {isLoading ? (
@@ -849,21 +915,21 @@ export default function RegistrationPage() {
                       </div>
 
                       <div>
-                        <FormLabel>Subjects</FormLabel>
-                        <FormDescription>Select subjects for enrollment</FormDescription>
+                        <FormLabel className="text-gray-900 dark:text-white">Subjects</FormLabel>
+                        <FormDescription className="text-gray-600 dark:text-gray-400">Select subjects for enrollment</FormDescription>
 
                         {/* Changed layout to flex wrap for badges */}
                         <div className="flex flex-wrap gap-2 mt-3">
                           {/* Loading/Empty States */}
                           {subjectsLoading ? (
-                            <div className="flex items-center space-x-2 text-sm text-gray-500 w-full">
+                            <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400 w-full">
                               <Loader2 className="h-4 w-4 animate-spin" />
                               <span>Loading subjects...</span>
                             </div>
                           ) : !selectedClass ? (
-                            <p className="text-sm text-gray-500 w-full">Please select a class first.</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 w-full">Please select a class first.</p>
                           ) : subjects && subjects.length === 0 ? (
-                            <p className="text-sm text-gray-500 w-full">No subjects found for this class.</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 w-full">No subjects found for this class.</p>
                           ) : null}
 
                           {/* Select/Deselect All Button */}
@@ -905,7 +971,7 @@ export default function RegistrationPage() {
                         </div>
 
                         {studentForm.formState.errors.subjects && (
-                          <p className="text-sm font-medium text-red-500 mt-2">
+                          <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-2">
                             {studentForm.formState.errors.subjects.message}
                           </p>
                         )}
@@ -925,7 +991,7 @@ export default function RegistrationPage() {
 
                         <Button
                           type="submit"
-                          className="flex-1 bg-blue-600 hover:bg-blue-700"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                           disabled={isLoading}
                         >
                           {isLoading ? (
@@ -1037,7 +1103,7 @@ export default function RegistrationPage() {
 
                         <Button
                           type="submit"
-                          className="flex-1 bg-blue-600 hover:bg-blue-700"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                           disabled={isLoading}
                         >
                           {isLoading ? (
@@ -1056,11 +1122,11 @@ export default function RegistrationPage() {
               </motion.div>
             </AnimatePresence>
 
-            <div className="mt-8 pt-6 border-t text-center text-gray-500 text-sm">
+            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-center text-gray-500 dark:text-gray-400 text-sm">
               Already have an account?{" "}
               <Button
                 variant="link"
-                className="p-0 text-blue-600"
+                className="p-0 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                 onClick={() => router.push("/login")}
               >
                 Log in

@@ -7,146 +7,147 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import {
-  Menu,
-  UsersRound,
-  BarChart3,
-  BookOpen,
-  Calendar,
-  Settings,
-  MessageSquare
-} from "lucide-react";
+import { Menu as MenuIcon, Ellipsis } from "lucide-react";
 import { useState } from "react";
-import  LogoSymbol  from "@/components/logo-symbol";
+import LogoSymbol from "@/components/logo-symbol";
+import LogoText from "@/components/logo-text";
+import { getMenuList } from "@/lib/menu-list";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider
+} from "@/components/ui/tooltip";
 
-const parentNavItems = [
-  {
-    title: "Dashboard",
-    href: "/parent/dashboard",
-    icon: <BarChart3 className="h-5 w-5" />
-  },
-  {
-    title: "My Children",
-    href: "/parent/children",
-    icon: <UsersRound className="h-5 w-5" />
-  },
-  {
-    title: "Courses",
-    href: "/parent/courses",
-    icon: <BookOpen className="h-5 w-5" />
-  },
-  {
-    title: "Calendar",
-    href: "/parent/calendar",
-    icon: <Calendar className="h-5 w-5" />
-  },
-  {
-    title: "Messages",
-    href: "/parent/messages",
-    icon: <MessageSquare className="h-5 w-5" />
-  },
-  {
-    title: "Settings",
-    href: "/parent/settings",
-    icon: <Settings className="h-5 w-5" />
-  }
-];
+interface ParentSidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+  isOpen?: boolean;
+}
 
-interface ParentSidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
-
-export default function ParentSidebar({ className }: ParentSidebarProps) {
+export default function ParentSidebar({ className, isOpen = true }: ParentSidebarProps) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const menuList = getMenuList(pathname, 'parent');
+
+  const SidebarContent = ({ isMobile = false }) => (
+    <>
+      <div className="flex h-14 items-center border-b px-4">
+        <Link
+          href="/parent/dashboard"
+          className="flex items-center gap-2 font-semibold"
+          onClick={() => isMobile && setMobileOpen(false)}
+        >
+          <LogoSymbol className="h-6 w-6" />
+          <span className={cn(
+            "transition-all duration-300",
+            !isOpen && !isMobile ? "opacity-0 w-0" : "opacity-100"
+          )}>
+            <LogoText className="h-5" />
+          </span>
+        </Link>
+      </div>
+      <ScrollArea className="flex-1">
+        <nav className="flex flex-col gap-1 p-2">
+          {menuList.map(({ groupLabel, menus }, groupIndex) => (
+            <div key={groupIndex} className="mb-4">
+              {(isOpen || isMobile) && groupLabel && (
+                <h3 className="text-xs font-semibold text-muted-foreground px-3 pb-2">
+                  {groupLabel}
+                </h3>
+              )}
+              {!isOpen && !isMobile && groupLabel && (
+                <TooltipProvider>
+                  <Tooltip delayDuration={100}>
+                    <TooltipTrigger className="w-full">
+                      <div className="flex justify-center items-center py-2">
+                        <Ellipsis className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>{groupLabel}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {menus.map((item, itemIndex) => {
+                const Icon = item.icon;
+                return (
+                  <TooltipProvider key={itemIndex} disableHoverableContent>
+                    <Tooltip delayDuration={100}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={pathname.startsWith(item.href) ? "secondary" : "ghost"}
+                          className={cn(
+                            "w-full justify-start gap-2 h-10",
+                            pathname.startsWith(item.href) &&
+                              "bg-sidebar-accent text-sidebar-accent-foreground"
+                          )}
+                          asChild
+                        >
+                          <Link 
+                            href={item.href} 
+                            onClick={() => isMobile && setMobileOpen(false)}
+                          >
+                            <span className={cn(!isOpen && !isMobile ? "" : "mr-2")}>
+                              <Icon className="h-4 w-4" />
+                            </span>
+                            <span className={cn(
+                              "transition-all duration-300",
+                              !isOpen && !isMobile 
+                                ? "opacity-0 w-0 hidden" 
+                                : "opacity-100"
+                            )}>
+                              {item.label}
+                            </span>
+                          </Link>
+                        </Button>
+                      </TooltipTrigger>
+                      {!isOpen && !isMobile && (
+                        <TooltipContent side="right">
+                          {item.label}
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+      </ScrollArea>
+    </>
+  );
 
   return (
     <>
       {/* Mobile sidebar */}
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetTrigger asChild>
           <Button
             variant="outline"
             size="icon"
             className="h-9 w-9 fixed left-4 top-4 z-40 md:hidden flex items-center justify-center"
           >
-            <Menu className="h-5 w-5" />
+            <MenuIcon className="h-4 w-4" />
             <span className="sr-only">Toggle Menu</span>
           </Button>
         </SheetTrigger>
         <SheetContent
           side="left"
-          className="flex flex-col bg-sidebar-background border-r p-0"
+          className="flex flex-col bg-sidebar-background border-r p-0 w-72"
         >
-          <div className="flex h-14 items-center border-b px-4">
-            <Link
-              href="/parent/dashboard"
-              className="flex items-center gap-2 font-semibold"
-              onClick={() => setOpen(false)}
-            >
-              <LogoSymbol className="h-6 w-6" />
-              <span>LMS Portal</span>
-            </Link>
-          </div>
-          <ScrollArea className="flex-1">
-            <div className="flex flex-col gap-1 p-2">
-              {parentNavItems.map((item) => (
-                <Button
-                  key={item.href}
-                  variant={pathname === item.href ? "secondary" : "ghost"}
-                  className={cn(
-                    "justify-start gap-2",
-                    pathname === item.href &&
-                      "bg-sidebar-accent text-sidebar-accent-foreground"
-                  )}
-                  asChild
-                >
-                  <Link href={item.href} onClick={() => setOpen(false)}>
-                    {item.icon}
-                    {item.title}
-                  </Link>
-                </Button>
-              ))}
-            </div>
-          </ScrollArea>
+          <SidebarContent isMobile />
         </SheetContent>
       </Sheet>
 
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          "hidden md:flex w-56 flex-col bg-sidebar-background border-r",
+          "hidden md:flex flex-col bg-sidebar-background border-r transition-all duration-300",
+          isOpen ? "w-56" : "w-16",
           className
         )}
       >
-        <div className="flex h-14 items-center border-b px-4">
-          <Link
-            href="/parent/dashboard"
-            className="flex items-center gap-2 font-semibold"
-          >
-            <LogoSymbol className="h-6 w-6" />
-            <span>Parent Portal</span>
-          </Link>
-        </div>
-        <ScrollArea className="flex-1">
-          <div className="flex flex-col gap-1 p-2">
-            {parentNavItems.map((item) => (
-              <Button
-                key={item.href}
-                variant={pathname === item.href ? "secondary" : "ghost"}
-                className={cn(
-                  "justify-start gap-2",
-                  pathname === item.href &&
-                    "bg-sidebar-accent text-sidebar-accent-foreground"
-                )}
-                asChild
-              >
-                <Link href={item.href}>
-                  {item.icon}
-                  {item.title}
-                </Link>
-              </Button>
-            ))}
-          </div>
-        </ScrollArea>
+        <SidebarContent />
       </aside>
     </>
   );

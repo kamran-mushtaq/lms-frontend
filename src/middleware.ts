@@ -17,9 +17,9 @@ const publicPaths = [
 // Route patterns based on user types
 const rolePatterns = {
   student: /^\/student/,
-  parent: /^\/parent/,
+  guardian: /^\/guardian/,
   teacher: /^\/teacher/,
-  admin: /^\/admin/
+  admin: /^\/admin/,
 };
 
 // Define protected paths that require aptitude test completion
@@ -39,11 +39,11 @@ const ROOT_ACCESSIBLE_PATHS = [
 
 // Paths that are exempt from the aptitude test check
 const APTITUDE_TEST_EXEMPT_PATHS = [
-  '/assessment',
-  '/api',
-  '/admin',
-  '/parent',
-  '/teacher',
+  "/assessment",
+  "/api",
+  "/admin",
+  "/guardian",
+  "/teacher",
   // '/lectures' // Add lectures to exempt paths
 ];
 
@@ -94,8 +94,8 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/admin") && userType !== "admin";
     const isAccessingTeacherRoutes =
       pathname.startsWith("/teacher") && userType !== "teacher";
-    const isAccessingParentRoutes =
-      pathname.startsWith("/parent") && userType !== "parent";
+    const isAccessingguardianRoutes =
+      pathname.startsWith("/guardian") && userType !== "guardian";
     const isAccessingStudentRoutes =
       pathname.startsWith("/student") && userType !== "student";
       
@@ -108,7 +108,7 @@ export async function middleware(request: NextRequest) {
     if (
       isAccessingAdminRoutes ||
       isAccessingTeacherRoutes ||
-      isAccessingParentRoutes ||
+      isAccessingguardianRoutes ||
       (isAccessingStudentRoutes && !isRootAccessiblePath) ||
       // Add check for student accessing generic dashboard
       (pathname === '/dashboard' && userType === 'student')

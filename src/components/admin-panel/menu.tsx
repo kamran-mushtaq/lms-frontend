@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { Ellipsis, LogOut } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
-import { getMenuList } from "@/lib/menu-list";
+import { getMenuList, getRoleFromPath, UserRole } from "@/lib/menu-list";
+import { getUserRole } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CollapseMenuButton } from "@/components/admin-panel/collapse-menu-button";
@@ -18,11 +20,24 @@ import {
 
 interface MenuProps {
   isOpen: boolean | undefined;
+  userRole?: UserRole;
 }
 
-export function Menu({ isOpen }: MenuProps) {
+export function Menu({ isOpen, userRole }: MenuProps) {
   const pathname = usePathname();
-  const menuList = getMenuList(pathname);
+  const [currentRole, setCurrentRole] = useState<UserRole>('admin');
+
+  useEffect(() => {
+    // Get role from props, localStorage, or path
+    const role = userRole || getUserRole() || getRoleFromPath(pathname);
+    setCurrentRole(role);
+  }, [userRole, pathname]);
+
+  
+console.log("currentRole", currentRole);
+
+
+  const menuList = getMenuList(pathname, currentRole);
 
   return (
     <ScrollArea className="[&>div>div[style]]:!block">

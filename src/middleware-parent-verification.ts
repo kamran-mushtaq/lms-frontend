@@ -44,7 +44,7 @@ export function middleware(request: NextRequest) {
     }
 
     // For parent dashboard paths, check parent verification
-    if (request.nextUrl.pathname.startsWith("/(dashboard)/parent")) {
+    if (request.nextUrl.pathname.startsWith("/(dashboard)/guardian")) {
       // Check parent verification status
       const isVerified = userData.isVerified;
 

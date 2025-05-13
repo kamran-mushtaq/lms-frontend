@@ -1,4 +1,5 @@
 "use client";
+"use client";
 
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -17,7 +18,7 @@ interface ProtectedLayoutProps {
 
 export function ProtectedLayout({
   children,
-  allowedRoles = ["admin", "teacher", "parent", "student"],
+  allowedRoles = ["admin", "teacher", "guardian", "student"],
   title = "Dashboard"
 }: ProtectedLayoutProps) {
   const { user, isLoading } = useAuth();
@@ -42,8 +43,8 @@ export function ProtectedLayout({
         case "teacher":
           router.push("/teacher/dashboard");
           break;
-        case "parent":
-          router.push("/parent/dashboard");
+        case "guardian":
+          router.push("/guardian/dashboard");
           break;
         case "student":
           router.push("/student/dashboard");

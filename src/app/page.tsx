@@ -14,7 +14,7 @@ export default function LandingPage() {
   useEffect(() => {
     if (user) {
       // If the user is a parent and not verified, redirect to OTP verification
-      if (user.type === "parent" && !user.isVerified) {
+      if (user.type === "guardian" && !user.isVerified) {
         router.push(`/verify-otp?userId=${user._id}`);
       } else {
         // Otherwise redirect to appropriate dashboard based on user type
@@ -25,8 +25,8 @@ export default function LandingPage() {
           case "teacher":
             router.push("/teacher/dashboard");
             break;
-          case "parent":
-            router.push("/parent/dashboard");
+          case "guardian":
+            router.push("/guardian/dashboard");
             break;
           default:
             router.push("/student/dashboard");

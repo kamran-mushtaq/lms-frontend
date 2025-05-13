@@ -11,8 +11,12 @@ import {
   Tag,
   Settings,
   ListTodo,
-  School
+  School,
+  CreditCard
 } from "lucide-react";
+
+import { useAuth } from "@/contexts/AuthContext";
+
 
 type Submenu = {
   href: string;
@@ -32,9 +36,13 @@ type Group = {
   groupLabel: string;
   menus: Menu[];
 };
-
 export function getMenuList(pathname: string): Group[] {
-  return [
+  const { user } = useAuth();
+  console.log("user", user);
+
+  if (!user) return [];
+
+  const commonMenus: Group[] = [
     {
       groupLabel: "Overview",
       menus: [
@@ -42,10 +50,13 @@ export function getMenuList(pathname: string): Group[] {
           href: "/manage/dashboard",
           label: "Dashboard",
           icon: LayoutGrid,
-          submenus: []
-        }
-      ]
+          submenus: [],
+        },
+      ],
     },
+  ];
+
+  const adminMenus: Group[] = [
     {
       groupLabel: "User Management",
       menus: [
@@ -53,21 +64,15 @@ export function getMenuList(pathname: string): Group[] {
           href: "/manage/users",
           label: "Users",
           icon: Users,
-          submenus: []
+          submenus: [],
         },
         {
           href: "/manage/enrollments",
           label: "Enrollments",
           icon: GraduationCap,
-          submenus: []
+          submenus: [],
         },
-        // {
-        //   href: "/manage/guardian-student",
-        //   label: "Guardian Student",
-        //   icon: School,
-        //   submenus: []
-        // }
-      ]
+      ],
     },
     {
       groupLabel: "Academic Content",
@@ -76,39 +81,39 @@ export function getMenuList(pathname: string): Group[] {
           href: "/manage/classes",
           label: "Classes",
           icon: ClipboardList,
-          submenus: []
+          submenus: [],
         },
         {
           href: "/manage/subjects",
           label: "Subjects",
           icon: BookOpen,
-          submenus: []
+          submenus: [],
         },
         {
           href: "/manage/chapters",
           label: "Chapters",
           icon: BookOpen,
-          submenus: []
+          submenus: [],
         },
         {
           href: "/manage/lectures",
           label: "Lectures",
           icon: BookOpen,
-          submenus: []
+          submenus: [],
         },
         {
           href: "/manage/study-plans",
           label: "Study Plans",
           icon: ListTodo,
-          submenus: []
+          submenus: [],
         },
         {
           href: "/manage/content-versions",
           label: "Content Versions",
           icon: Layers,
-          submenus: []
-        }
-      ]
+          submenus: [],
+        },
+      ],
     },
     {
       groupLabel: "Assessments",
@@ -117,21 +122,21 @@ export function getMenuList(pathname: string): Group[] {
           href: "/manage/assessments-management",
           label: "Assessments",
           icon: ClipboardList,
-          submenus: []
+          submenus: [],
         },
         {
           href: "/manage/questions",
           label: "Questions",
           icon: FileText,
-          submenus: []
+          submenus: [],
         },
         {
           href: "/manage/assessment-templates",
           label: "Assessment Templates",
           icon: FileText,
-          submenus: []
-        }
-      ]
+          submenus: [],
+        },
+      ],
     },
     {
       groupLabel: "Attributes & Types",
@@ -140,44 +145,68 @@ export function getMenuList(pathname: string): Group[] {
           href: "/manage/attributes",
           label: "Attributes",
           icon: Tag,
-          submenus: []
+          submenus: [],
         },
         {
           href: "/manage/attribute-types",
           label: "Attribute Types",
           icon: Tag,
-          submenus: []
-        }
-      ]
+          submenus: [],
+        },
+      ],
     },
     {
       groupLabel: "System Settings",
       menus: [
-        // {
-        //   href: "#",
-        //   label: "Notifications",
-        //   icon: Bell,
-        //   submenus: []
-        // },
-        // {
-        //   href: "/manage/feature-flags",
-        //   label: "Feature Flags",
-        //   icon: Flag,
-        //   submenus: []
-        // },
         {
           href: "/admin/settings",
-          label: "Settings",
+          label: "System Settings",
           icon: Settings,
-          submenus: []
+          submenus: [],
         },
-        // {
-        //   href: "#",
-        //   label: "Payments",
-        //   icon: Settings,
-        //   submenus: []
-        // }
-      ]
-    }
+        {
+          href: "#",
+          label: "Notifications",
+          icon: Bell,
+          submenus: [],
+        },
+        {
+          href: "#",
+          label: "Payments",
+          icon: CreditCard,
+          submenus: [],
+        },
+      ],
+    },
   ];
+
+  const guardianMenus: Group[] = [
+    {
+      groupLabel: "Guardian",
+      menus: [
+        {
+          href: "/child-list",
+          label: "My children",
+          icon: School,
+          submenus: [],
+        },
+        {
+          href: "/guardian/attendance",
+          label: "Attendance",
+          icon: ClipboardList,
+          submenus: [],
+        },
+      ],
+    },
+  ];
+
+  // Return menu based on user.type
+  switch (user.type) {
+    case "admin":
+      return [...commonMenus, ...adminMenus];
+    case "guardian":
+      return [...commonMenus, ...guardianMenus];
+    default:
+      return commonMenus;
+  }
 }

@@ -1,5 +1,6 @@
+// components/admin-panel-parent/sidebar.tsx
 "use client";
-import { Menu } from "@/components/admin-panel/menu";
+import { ParentMenu } from "@/components/parent-dashboard/parent-menu";
 
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -9,7 +10,7 @@ import Link from "next/link";
 import LogoText from "@/components/logo-text";
 import LogoSymbol from "@/components/logo-symbol";
 
-export function Sidebar() {
+export function ParentSidebar() {
   const sidebar = useStore(useSidebar, (x) => x);
   if (!sidebar) return null;
   const { getOpenState, setIsHover, settings } = sidebar;
@@ -21,7 +22,6 @@ export function Sidebar() {
         settings.disabled && "hidden"
       )}
     >
-      {/* <SidebarToggle isOpen={isOpen} setIsOpen={toggleOpen} /> */}
       <div
         onMouseEnter={() => setIsHover(true)}
         onMouseLeave={() => setIsHover(false)}
@@ -35,7 +35,7 @@ export function Sidebar() {
           variant="link"
           asChild
         >
-          <Link href="/dashboard" className="flex items-center gap-2 logo mt-3">
+          <Link href="/parent/dashboard" className="flex items-center gap-2 logo mt-3">
             <LogoSymbol className="absolute left-0 top-0 w-full h-full" />
             <h1
               className={cn(
@@ -45,12 +45,11 @@ export function Sidebar() {
                   : "translate-x-0 opacity-100"
               )}
             >
-              {/* me */}
               <LogoText className="logo-text" />
             </h1>
           </Link>
         </Button>
-        <Menu isOpen={getOpenState()} />
+        <ParentMenu isOpen={getOpenState()} />
       </div>
     </aside>
   );
