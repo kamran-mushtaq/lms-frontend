@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import apiClient from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
+import { getStudentProgressOverview, getRecentActivity } from "./api/dashboard-api";
+import { getUpcomingAssessments } from "@/app/aptitude-test/api/assessment-api";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useSWRConfig } from "swr";
@@ -66,17 +68,44 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        // Fetch student dashboard data
-        const response = await apiClient.get("/student-progress/dashboard");
+        const studentId = user.id;
 
-        if (response.data) {
-          setStats(response.data.stats);
-          setSubjects(response.data.subjects || []);
-          setUpcomingAssessments(response.data.upcomingAssessments || []);
-          setRecentActivities(response.data.recentActivities || []);
-        }
+        // Fetch overall progress stats
+        const statsData = await getStudentProgressOverview(studentId);
+        setStats(statsData);
+
+        // Fetch upcoming assessments
+        const upcomingAssessmentsData = await getUpcomingAssessments(studentId);
+        setUpcomingAssessments(upcomingAssessmentsData);
+
+        // Fetch recent activity
+        const recentActivitiesData = await getRecentActivity(studentId);
+        setRecentActivities(recentActivitiesData);
+
+        // Fetch enrolled subjects and their progress
+        const enrollmentsData = await getStudentEnrollments(studentId, { isEnrolled: true });
+
+        const subjectsWithProgress = await Promise.all(
+          enrollmentsData.map(async (enrollment: any) => {
+            const subjectProgress = await getSubjectProgress(studentId, enrollment.subjectId._id);
+            return {
+              id: enrollment.subjectId._id,
+              name: enrollment.subjectId.displayName,
+              progress: subjectProgress?.completionPercentage || 0,
+              lastActivity: subjectProgress?.lastAccessedAt || '',
+              nextChapter: subjectProgress?.nextChapterName || 'Start Learning',
+            };
+          })
+        );
+        setSubjects(subjectsWithProgress);
+
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
         toast({

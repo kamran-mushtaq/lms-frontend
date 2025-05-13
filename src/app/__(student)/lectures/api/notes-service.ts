@@ -6,6 +6,7 @@ export interface Note {
   _id: string;
   content: string;
   timestamp?: number;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -17,6 +18,7 @@ export interface NotesResponse {
 export interface NoteData {
   content: string;
   timestamp?: number;
+  tags?: string[];
 }
 
 /**
@@ -26,15 +28,25 @@ export const getNotesByLecture = async (lectureId: string): Promise<NotesRespons
   try {
     console.log(`Fetching notes for lecture: ${lectureId}`);
     try {
-      const response = await apiClient.get(`/notes/lecture/${lectureId}`);
+      const response = await apiClient.get(`/notes/lectures/${lectureId}`);
       console.log('Notes response:', response.data);
       
       // Check if the response has the expected format
       if (response.data) {
         if (Array.isArray(response.data)) {
-          return { notes: response.data };
+          // Ensure each note has tags array if not present
+          const notes = response.data.map(note => ({
+            ...note,
+            tags: note.tags || []
+          }));
+          return { notes };
         } else if (response.data.notes && Array.isArray(response.data.notes)) {
-          return response.data;
+          // Ensure each note has tags array if not present
+          const notes = response.data.notes.map(note => ({
+            ...note,
+            tags: note.tags || []
+          }));
+          return { notes };
         }
       }
       
@@ -49,27 +61,26 @@ export const getNotesByLecture = async (lectureId: string): Promise<NotesRespons
         
         // Check if the response has the expected format
         if (altResponse.data && Array.isArray(altResponse.data)) {
-          // Transform to expected format if needed
-          return { notes: altResponse.data };
+          // Ensure each note has tags array if not present
+          const notes = altResponse.data.map(note => ({
+            ...note,
+            tags: note.tags || []
+          }));
+          return { notes };
         } else if (altResponse.data && Array.isArray(altResponse.data.notes)) {
-          return altResponse.data;
+          // Ensure each note has tags array if not present
+          const notes = altResponse.data.notes.map(note => ({
+            ...note,
+            tags: note.tags || []
+          }));
+          return { notes };
         }
         
         return { notes: [] };
       } catch (altError) {
         console.error('Error fetching from alternative notes endpoint:', altError);
-        // Just return a mock note for testing - you can remove this later
-        return { 
-          notes: [
-            {
-              _id: 'mock1',
-              content: 'This is a mock note to check if the UI is working',
-              timestamp: 0,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            }
-          ]
-        };
+        // Return empty notes instead of mock for now
+        return { notes: [] };
       }
     }
   } catch (error: any) {
@@ -85,9 +96,21 @@ export const getNotesByLecture = async (lectureId: string): Promise<NotesRespons
 export const createNote = async (lectureId: string, noteData: NoteData): Promise<Note> => {
   try {
     console.log(`Creating note for lecture ${lectureId}:`, noteData);
-    const response = await apiClient.post(`/notes/lectures/${lectureId}`, noteData);
+    
+    // Ensure tags is included in the payload
+    const payload = {
+      ...noteData,
+      tags: noteData.tags || []
+    };
+    
+    const response = await apiClient.post(`/notes/lectures/${lectureId}`, payload);
     console.log('Create note response:', response.data);
-    return response.data;
+    
+    // Ensure the response has tags
+    return {
+      ...response.data,
+      tags: response.data.tags || []
+    };
   } catch (error: any) {
     console.error('Error creating note:', error);
     
@@ -95,9 +118,18 @@ export const createNote = async (lectureId: string, noteData: NoteData): Promise
     if (error.response && (error.response.status === 404 || error.response.status === 400)) {
       try {
         console.log(`Trying alternative create note endpoint: /lecture-notes/${lectureId}`);
-        const altResponse = await apiClient.post(`/lecture-notes/${lectureId}`, noteData);
+        const payload = {
+          ...noteData,
+          tags: noteData.tags || []
+        };
+        const altResponse = await apiClient.post(`/lecture-notes/${lectureId}`, payload);
         console.log('Alternative create note response:', altResponse.data);
-        return altResponse.data;
+        
+        // Ensure the response has tags
+        return {
+          ...altResponse.data,
+          tags: altResponse.data.tags || []
+        };
       } catch (altError) {
         console.error('Error creating note with alternative endpoint:', altError);
       }
@@ -115,7 +147,12 @@ export const updateNote = async (noteId: string, noteData: Partial<NoteData>): P
     console.log(`Updating note ${noteId}:`, noteData);
     const response = await apiClient.put(`/notes/${noteId}`, noteData);
     console.log('Update note response:', response.data);
-    return response.data;
+    
+    // Ensure the response has tags
+    return {
+      ...response.data,
+      tags: response.data.tags || []
+    };
   } catch (error: any) {
     console.error('Error updating note:', error);
     
@@ -125,7 +162,12 @@ export const updateNote = async (noteId: string, noteData: Partial<NoteData>): P
         console.log(`Trying alternative update note endpoint: /lecture-notes/${noteId}`);
         const altResponse = await apiClient.put(`/lecture-notes/${noteId}`, noteData);
         console.log('Alternative update note response:', altResponse.data);
-        return altResponse.data;
+        
+        // Ensure the response has tags
+        return {
+          ...altResponse.data,
+          tags: altResponse.data.tags || []
+        };
       } catch (altError) {
         console.error('Error updating note with alternative endpoint:', altError);
       }

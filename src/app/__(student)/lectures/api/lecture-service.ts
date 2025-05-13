@@ -33,7 +33,8 @@ export interface Lecture {
 }
 
 export interface TranscriptItem {
-  time: number;
+  start: number;
+  end: number;
   text: string;
 }
 
@@ -56,6 +57,32 @@ export interface ProgressData {
 }
 
 /**
+ * Test API connection and available routes
+ */
+export const testApiConnection = async () => {
+  const token = localStorage.getItem('token');
+  console.log('Token available:', token ? 'Yes' : 'No');
+  
+  // Test different possible routes for progress update
+  const testRoutes = [
+    `/lectures`,
+    `/api/lectures`,
+    `/lectures/test/progress`,
+    `/api/lectures/test/progress`
+  ];
+  
+  for (const route of testRoutes) {
+    try {
+      console.log(`Testing route: ${route}`);
+      const response = await apiClient.get(route);
+      console.log(`✅ ${route} - Status: ${response.status}`);
+    } catch (error: any) {
+      console.log(`❌ ${route} - Status: ${error.response?.status || 'Network Error'}, Message: ${error.message}`);
+    }
+  }
+};
+
+/**
  * Get lecture details by ID
  */
 export const getLectureById = async (id: string): Promise<Lecture> => {
@@ -73,82 +100,11 @@ export const getLectureById = async (id: string): Promise<Lecture> => {
  */
 export const getLectureDetails = async (id: string) => {
   try {
-    console.log(`Fetching lecture details from: /lectures/${id}/details`);
-    try {
-      const response = await apiClient.get(`/lectures/${id}/details`);
-      console.log('Lecture details response:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching lecture details:', error);
-      
-      // Try fallback to basic lecture info if /details endpoint fails
-      console.log(`Falling back to basic lecture info: /lectures/${id}`);
-      const basicResponse = await apiClient.get(`/lectures/${id}`);
-      console.log('Basic lecture response:', basicResponse.data);
-      
-      const lectureData = basicResponse.data;
-      
-      // Get chapter ID from the lecture
-      const chapterId = lectureData.chapterId || 
-                       (lectureData.chapter && lectureData.chapter._id) || 
-                       (typeof lectureData.chapter === 'string' ? lectureData.chapter : '');
-      
-      if (chapterId) {
-        // Fetch chapter data to get chapter title and lectures
-        try {
-          console.log(`Fetching chapter data for: ${chapterId}`);
-          const chapterResponse = await apiClient.get(`/chapters/${chapterId}`);
-          console.log('Chapter data response:', chapterResponse.data);
-          
-          if (chapterResponse.data) {
-            lectureData.chapterTitle = chapterResponse.data.title || '';
-            lectureData.chapterLectures = chapterResponse.data.lectures || [];
-          }
-        } catch (chapterError) {
-          console.error('Error fetching chapter data:', chapterError);
-        }
-      }
-      
-      // Fetch lecture resources
-      try {
-        console.log(`Fetching resources for lecture: ${id}`);
-        const resourcesResponse = await apiClient.get(`/lectures/${id}/resources`);
-        console.log('Resources response:', resourcesResponse.data);
-        
-        if (resourcesResponse.data) {
-          if (Array.isArray(resourcesResponse.data)) {
-            lectureData.resources = resourcesResponse.data;
-          } else if (resourcesResponse.data.resources) {
-            lectureData.resources = resourcesResponse.data.resources;
-          }
-        }
-      } catch (resourcesError) {
-        console.error('Error fetching resources:', resourcesError);
-        lectureData.resources = [];
-      }
-      
-      // Fetch lecture transcript
-      try {
-        console.log(`Fetching transcript for lecture: ${id}`);
-        const transcriptResponse = await apiClient.get(`/lectures/${id}/transcript`);
-        console.log('Transcript response:', transcriptResponse.data);
-        
-        if (transcriptResponse.data) {
-          if (Array.isArray(transcriptResponse.data)) {
-            lectureData.transcript = transcriptResponse.data;
-          } else if (transcriptResponse.data.transcript) {
-            lectureData.transcript = transcriptResponse.data.transcript;
-          }
-        }
-      } catch (transcriptError) {
-        console.error('Error fetching transcript:', transcriptError);
-        lectureData.transcript = [];
-      }
-      
-      return lectureData;
-    }
-  } catch (error: any) {
-    console.error('Error in getLectureDetails:', error);
+    // Use the correct endpoint first
+    const response = await apiClient.get(`/lectures/${id}/details`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching lecture details:', error);
     throw error;
   }
 };
@@ -158,31 +114,15 @@ export const getLectureDetails = async (id: string) => {
  */
 export const getLectureTranscript = async (id: string): Promise<{ transcript: TranscriptItem[] }> => {
   try {
-    console.log(`Fetching lecture transcript from: /lectures/${id}/transcript`);
     const response = await apiClient.get(`/lectures/${id}/transcript`);
-    console.log('Transcript response:', response.data);
-    return response.data;
+    // The API returns an array directly, so wrap it
+    return { transcript: response.data };
   } catch (error: any) {
     console.error('Error fetching lecture transcript:', error);
-    // Try alternative endpoints if the main one fails
-    // Return empty transcript array instead of throwing
-    if (error.response && error.response.status === 404) {
-      console.log('Transcript endpoint returned 404, trying alternative endpoint');
-      try {
-        console.log(`Trying alternative transcript endpoint: /transcripts/lecture/${id}`);
-        const altResponse = await apiClient.get(`/transcripts/lecture/${id}`);
-        console.log('Alternative transcript response:', altResponse.data);
-        return altResponse.data;
-      } catch (altError) {
-        console.error('Error fetching from alternative transcript endpoint:', altError);
-        // Return empty transcript array
-        return { transcript: [] };
-      }
+    if (error.response?.status === 404) {
+      return { transcript: [] };
     }
-    
-    // Return empty transcript for any error
-    console.log('Transcript not available, returning empty array');
-    return { transcript: [] };
+    throw error;
   }
 };
 
@@ -191,126 +131,43 @@ export const getLectureTranscript = async (id: string): Promise<{ transcript: Tr
  */
 export const getLectureResources = async (id: string) => {
   try {
-    console.log(`Fetching lecture resources from: /lectures/${id}/resources`);
     const response = await apiClient.get(`/lectures/${id}/resources`);
-    console.log('Resources response:', response.data);
-    
-    // Check different possible response formats
-    if (response.data && response.data.resources && Array.isArray(response.data.resources)) {
-      return response.data;
-    } else if (response.data && Array.isArray(response.data)) {
-      // If API returns array directly, wrap it in expected format
-      return { resources: response.data };
-    } else if (response.data && response.data.lecture_resources && Array.isArray(response.data.lecture_resources)) {
-      // Handle alternative field name
-      return { resources: response.data.lecture_resources };
-    } else if (response.data && typeof response.data === 'object') {
-      // For any other format, return whatever we got
-      return response.data;
-    }
-    
-    // Default empty resources
-    return { resources: [] };
+    // The API returns an array directly, so wrap it
+    return { resources: response.data };
   } catch (error: any) {
     console.error('Error fetching lecture resources:', error);
-    // If the API returns 404, it might mean there are no resources or the endpoint doesn't exist
-    // Return an empty resources array instead of throwing an error
-    if (error.response && error.response.status === 404) {
-      console.log('Resources endpoint returned 404, returning empty resources');
+    if (error.response?.status === 404) {
       return { resources: [] };
     }
-    
-    // For backward compatibility, try an alternative endpoint format
-    try {
-      console.log(`Trying alternative resources endpoint: /resources/lecture/${id}`);
-      const altResponse = await apiClient.get(`/resources/lecture/${id}`);
-      console.log('Alternative resources response:', altResponse.data);
-      
-      // Check different possible response formats
-      if (altResponse.data && altResponse.data.resources && Array.isArray(altResponse.data.resources)) {
-        return altResponse.data;
-      } else if (altResponse.data && Array.isArray(altResponse.data)) {
-        // If API returns array directly, wrap it in expected format
-        return { resources: altResponse.data };
-      } else if (altResponse.data && altResponse.data.lecture_resources && Array.isArray(altResponse.data.lecture_resources)) {
-        // Handle alternative field name
-        return { resources: altResponse.data.lecture_resources };
-      } else if (altResponse.data && typeof altResponse.data === 'object') {
-        // For any other format, return whatever we got
-        return altResponse.data;
-      }
-      
-      return { resources: [] };
-    } catch (altError) {
-      console.error('Error fetching from alternative resources endpoint:', altError);
-      // Return empty resources instead of throwing
-      return { resources: [] };
-    }
+    throw error;
   }
 };
 
 /**
  * Get all lectures for a chapter
  */
-export const getLecturesByChapter = async (chapterId: string): Promise<any> => {
+export const getLecturesByChapter = async (chapterId: any): Promise<any> => {
   try {
-    console.log(`Fetching lectures for chapter: ${chapterId}`);
-    let response;
-    try {
-      // Try the chapters/:id endpoint first
-      response = await apiClient.get(`/chapters/${chapterId}`);
-      console.log('Chapter data response:', response.data);
-      
-      // If successful, return the lectures array from the chapter data
-      if (response.data && response.data.lectures) {
-        return {
-          chapterTitle: response.data.title,
-          lectures: response.data.lectures
-        };
-      }
-    } catch (firstError) {
-      console.log(`First endpoint attempt failed, trying alternative endpoints`);
-      // Try lecture endpoints
-      try {
-        response = await apiClient.get(`/lectures/byChapter/${chapterId}`);
-        console.log('Lectures by chapter response:', response.data);
-        return {
-          lectures: response.data
-        };
-      } catch (secondError) {
-        console.log('Second endpoint failed, trying chapters/:id/lectures endpoint');
-        response = await apiClient.get(`/chapters/${chapterId}/lectures`);
-        console.log('Chapter lectures response:', response.data);
-        return response.data;
-      }
-    }
-    return response.data;
+    // Use the correct endpoint from the API documentation
+    const response = await apiClient.get(`/lectures/byChapter/${chapterId._id}`);
+    
+    // The API returns a Lecture[] directly, not an object with lectures property
+    const lectures = response.data;
+    
+    // If we need chapter title, we'd need to make a separate call
+    // For now, return empty chapter title and the lectures array
+    return {
+      chapterTitle: '', // We'd need to fetch this separately if needed
+      lectures: lectures
+    };
   } catch (error: any) {
     console.error('Error fetching lectures by chapter:', error);
-    
-    // Try alternative endpoints if the main one fails
-    try {
-      console.log(`Trying alternative endpoint: /chapters/${chapterId}/lectures`);
-      const altResponse = await apiClient.get(`/chapters/${chapterId}/lectures`);
-      console.log('Alternative lectures response:', altResponse.data);
-      
-      // Transform the data to match the expected format if necessary
-      const formattedData = {
-        chapterTitle: altResponse.data.chapterTitle || '',
-        lectures: Array.isArray(altResponse.data.lectures) ? altResponse.data.lectures : []
-      };
-      
-      return formattedData;
-    } catch (altError) {
-      console.error('Error fetching from alternative lectures endpoint:', altError);
-      // Return empty structure instead of throwing
-      return { chapterTitle: '', lectures: [] };
-    }
+    throw error;
   }
 };
 
 /**
- * Update lecture progress
+ * Update lecture progress - USE POST /lectures/:id/progress endpoint
  */
 // Store last progress update time and values to avoid excessive API calls
 const lastProgressUpdate = {
@@ -356,67 +213,59 @@ export const updateLectureProgress = async (id: string, progressData: ProgressDa
       return null;
     }
     
-    // Format the request according to the API expectations
-    const payload = {
-      resourceId: id,
-      resourceType: 'lecture',
-      progressPercentage: progressData.progress || 0,
-      currentTime: progressData.currentTime || 0,
-      timeSpentMinutes: Math.floor((progressData.currentTime || 0) / 60),
-      status: progressData.progress >= 90 ? "completed" : "in_progress",
-      lastAccessedAt: new Date().toISOString()
-    };
-    
     // Update last progress values
     lastProgressUpdate.timestamp = now;
     lastProgressUpdate.lectureId = id;
     lastProgressUpdate.progress = progressData.progress || 0;
     lastProgressUpdate.currentTime = progressData.currentTime || 0;
     
-    // Try the correct endpoint format based on your API
-    try {
-      console.log(`Updating progress: ${progressData.progress}% at ${Math.floor((progressData.currentTime || 0))} seconds`);
-      // This is the correct endpoint based on your controller
-      const response = await apiClient.put(`/student-progress/${studentId}/resource/${id}?type=lecture`, payload);
-      return response.data;
-    } catch (firstError) {
-      console.log('First endpoint attempt failed, trying alternative endpoints');
+    // Use the correct endpoint from the API documentation
+    const payload = {
+      studentId,
+      progress: {
+        currentTimestamp: progressData.currentTime || 0,
+        percentageComplete: progressData.progress || 0
+      }
+    };
+    
+    // Try different possible endpoints since we're getting 404
+    const possibleEndpoints = [
+      `/lectures/${id}/progress`,
+    ];
+    
+    for (const endpoint of possibleEndpoints) {
       try {
-        // Try direct endpoint
-        const response = await apiClient.post(`/lectures/${id}/progress`, {
-          studentId,
-          progress: {
-            currentTimestamp: progressData.currentTime || 0,
-            percentageComplete: progressData.progress || 0
-          }
-        });
+        console.log(`Trying progress endpoint: ${endpoint}`, payload);
+        const response = await apiClient.post(endpoint, payload);
+        console.log(`✅ Progress update successful on ${endpoint}:`, response.data);
         return response.data;
-      } catch (secondError) {
-        // Fallback to the original endpoints
-        try {
-          const response = await apiClient.post(`/student-progress/${studentId}`, payload);
-          return response.data;
-        } catch (thirdError) {
-          const response = await apiClient.put(`/students/${studentId}/progress`, {
-            resourceId: id,
-            ...payload
-          });
-          return response.data;
+      } catch (error: any) {
+        console.log(`❌ Failed on ${endpoint} - Status: ${error.response?.status}, Data:`, error.response?.data);
+        
+        // If it's not the last endpoint, continue to the next one
+        if (endpoint !== possibleEndpoints[possibleEndpoints.length - 1]) {
+          continue;
         }
+        
+        // If all endpoints fail, throw the last error
+        throw error;
       }
     }
   } catch (error: any) {
     console.error('Error updating lecture progress:', error);
+    console.error('Error details:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        baseURL: error.config?.baseURL,
+        headers: error.config?.headers
+      }
+    });
     
-    // Log more detailed error information
-    if (error.response) {
-      console.error('Progress update response error:', {
-        status: error.response.status,
-        data: error.response.data
-      });
-    }
-    
-    // Don't throw this error, just log it
+    // Don't throw error, just return null to prevent UI crashes
     return null;
   }
 };
@@ -444,38 +293,47 @@ export const markLectureAsCompleted = async (id: string) => {
       return null;
     }
     
-    // Use the same payload structure that works with the progress endpoint
-    const payload = {
-      resourceId: id,
-      resourceType: 'lecture',
-      status: "completed",
-      progressPercentage: 100,
-      completedAt: new Date().toISOString()
-    };
+    // Try different possible endpoints since we're getting 404
+    const possibleEndpoints = [
+      `/lectures/${id}/complete`,
+      `/api/lectures/${id}/complete`
+    ];
     
-    // Try both endpoint formats as with the progress function
-    try {
-      console.log(`Trying to mark lecture as completed with endpoint: /student-progress/${studentId}`);
-      const response = await apiClient.post(`/student-progress/${studentId}`, payload);
-      console.log('Mark as completed successful with first endpoint');
-      return response.data;
-    } catch (firstError) {
-      console.log('First completion endpoint attempt failed, trying alternative');
-      const response = await apiClient.put(`/students/${studentId}/progress`, {
-        resourceId: id,
-        ...payload
-      });
-      console.log('Mark as completed successful with second endpoint');
-      return response.data;
+    const payload = { studentId };
+    
+    for (const endpoint of possibleEndpoints) {
+      try {
+        console.log(`Trying complete endpoint: ${endpoint}`, payload);
+        const response = await apiClient.post(endpoint, payload);
+        console.log(`✅ Lecture completion successful on ${endpoint}:`, response.data);
+        return response.data;
+      } catch (error: any) {
+        console.log(`❌ Failed on ${endpoint} - Status: ${error.response?.status}, Data:`, error.response?.data);
+        
+        // If it's not the last endpoint, continue to the next one
+        if (endpoint !== possibleEndpoints[possibleEndpoints.length - 1]) {
+          continue;
+        }
+        
+        // If all endpoints fail, throw the last error
+        throw error;
+      }
     }
   } catch (error: any) {
     console.error('Error marking lecture as completed:', error);
-    if (error.response) {
-      console.error('Complete lecture error response:', {
-        status: error.response.status,
-        data: error.response.data
-      });
-    }
+    console.error('Error details:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        baseURL: error.config?.baseURL,
+        headers: error.config?.headers
+      }
+    });
+    
+    // Don't throw error, just return null to prevent UI crashes
     return null;
   }
 };

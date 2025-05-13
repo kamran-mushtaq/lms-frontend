@@ -1,7 +1,7 @@
 // lib/api-client.ts
 import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://phpstack-732216-5200333.cloudwaysapps.com/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://phpstack-732216-5200333.cloudwaysapps.com";
 console.log("API_URL:", API_URL);
 
 const apiClient = axios.create({
