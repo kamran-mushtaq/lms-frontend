@@ -53,7 +53,7 @@ import { useStudentProgress } from "./hooks/use-student-progress";
 import { SubjectCard } from "./components/subject-card";
 import { SubjectListItem } from "./components/subject-list-item";
 import { EmptyState } from "./components/empty-state";
-
+import { useAuth } from "@/contexts/AuthContext";
 // Subject interface
 interface Subject {
   _id: string;
@@ -112,9 +112,10 @@ export default function SubjectsPage() {
   
   // Get router for navigation
   const router = useRouter();
+   const { user } = useAuth();
   
   // Use your actual student ID - based on API response example
-  const studentId = "67de8edd9db5cae783e02dd8";
+  const studentId = user?._id || "studentId"; // Replace with actual student ID from context or props
   
   // Fetch enrolled subjects and progress data
   const { enrollments, isLoading: isLoadingEnrollments, error: enrollmentsError } = useEnrollments(studentId);

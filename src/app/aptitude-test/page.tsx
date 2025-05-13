@@ -110,256 +110,162 @@ export default function AptitudeTestPage() {
           router.push('/login');
           return;
         }
-        
+
         const user = JSON.parse(storedUser);
         const studentId = user._id;
-        
-        console.log("Checking for pending assessments for student:", studentId);
-        
-        // Get pending assessments
-        const pendingData = await getPendingAssessments(studentId);
-        console.log('Pending assessments data:', pendingData); // Keep original log too
-        
-        if (pendingData.hasPendingTest && pendingData.pendingTests.length > 0) {
-            // Filter only aptitude tests
-            const aptitudeTests = pendingData.pendingTests.filter(
-              (test) => test.type === 'aptitude'
-            );
-            
-            console.log('Aptitude tests found:', JSON.stringify(aptitudeTests));
-            setPendingTests(aptitudeTests);
-          
-            if (aptitudeTests.length > 0) {
-                // Get the first test
-                const firstTest = aptitudeTests[0];
-                
-                // Debug the first test object structure
-                console.log("First aptitude test object:", JSON.stringify(firstTest));
-                
-                // Try to extract a valid test ID
-                let testId = null;
-                
-                if (firstTest.id) {
-                  console.log("Test ID from API:", firstTest.id, "Type:", typeof firstTest.id);
-                  
-                  if (typeof firstTest.id === 'string') {
-                    // Direct string ID
-                    testId = firstTest.id;
-                  } else if (typeof firstTest.id === 'object' && firstTest.id !== null) {
-                    // Object with potential _id field
-                    console.log("ID is an object:", JSON.stringify(firstTest.id));
-                    
-                    if (firstTest.id._id) {
-                      // Extract the _id property if it exists
-                      testId = typeof firstTest.id._id === 'string' 
-                        ? firstTest.id._id 
-                        : String(firstTest.id._id);
-                    } else if (firstTest.id.toString) {
-                      // Try to get a string representation
-                      testId = firstTest.id.toString();
-                    }
-                  }
-                }
-                
-                // If we couldn't get an ID from the id property, try looking for _id
-                if (!testId && firstTest._id) {
-                  console.log("Using _id property instead:", firstTest._id);
-                  testId = typeof firstTest._id === 'string' 
-                    ? firstTest._id 
-                    : String(firstTest._id);
-                }
-                
-                // Check if we have an ID
-                if (testId) {
-                  // Extract just the hex string if the value contains more information
-                  const hexMatch = testId.match(/[0-9a-fA-F]{24}/);
-                  if (hexMatch) {
-                    testId = hexMatch[0];
-                  }
-                  
-                  console.log("Final test ID to use:", testId);
-                  
-                  // Validate ID format
-                  const isValidId = /^[0-9a-fA-F]{24}$/.test(testId);
-                  if (isValidId) {
-                    console.log("Found valid aptitude test ID, moving to intro step");
-                    setSelectedTest(testId);
-                    setCurrentStep('intro');
-                  } else {
-                    console.error("Invalid test ID format after processing:", testId);
-                    throw new Error(`Invalid assessment ID format: ${testId}. Expected a 24-character hex string.`);
-                  }
-                } else {
-                  // No test ID yet, need to assign one
-                  console.log("Found aptitude test without ID, moving to no-test step");
-                  setCurrentStep('no-test');
-                }
-              } else {
-            // No test ID yet, need to assign one
-            console.log("Found aptitude test without ID, moving to no-test step");
-            setCurrentStep('no-test');
+
+        console.log("Checking student enrollment status for aptitude tests:", studentId);
+
+        // Use getStudentEnrollments as the primary source of truth
+        const enrollments = await getStudentEnrollments(studentId);
+        console.log("Student enrollments:", enrollments);
+
+        // 1. Check for assigned but incomplete aptitude tests
+        const incompleteTestEnrollments = enrollments.filter((enrollment: any) =>
+          !enrollment.aptitudeTestCompleted && enrollment.aptitudeTestId
+        );
+
+        console.log("Enrollments with assigned but incomplete tests:", incompleteTestEnrollments);
+
+        if (incompleteTestEnrollments.length > 0) {
+          console.log("Found assigned but incomplete tests.");
+          const firstIncompleteEnrollment = incompleteTestEnrollments[0];
+
+          // Extract and validate the test ID
+          let testId = firstIncompleteEnrollment.aptitudeTestId;
+          if (typeof testId === 'object' && testId !== null && testId._id) {
+            testId = testId._id.toString();
+          } else if (testId) {
+            testId = testId.toString();
+          } else {
+            testId = null;
           }
-        } else {
-          // Check enrollments directly to see if we need tests
-          console.log("No pending tests found in initial check, checking enrollments directly");
-          const enrollments = await getStudentEnrollments(studentId);
-          console.log("Student enrollments:", enrollments); // Keep original log too
-          
-          const pendingAptitudeEnrollments = enrollments.filter((enrollment) => 
-            !enrollment.aptitudeTestCompleted && (!enrollment.aptitudeTestId || enrollment.aptitudeTestId === undefined)
-          );
-          
-          console.log("Enrollments without aptitude tests:", pendingAptitudeEnrollments);
-          
-          if (pendingAptitudeEnrollments.length > 0) {
-            // Needs tests assigned
-            console.log("Enrollments found that need aptitude tests, moving to no-test step");
-            setPendingTests(pendingAptitudeEnrollments.map(e => ({
+
+          if (testId && /^[0-9a-fA-F]{24}$/.test(testId)) {
+            console.log("Setting selected test to the first incomplete test:", testId);
+            setSelectedTest(testId);
+            setCurrentStep('intro');
+          } else {
+            console.error("Invalid test ID found in enrollment:", testId);
+            setTestData(prev => ({
+              ...prev,
+              isLoading: false,
+              error: "Invalid aptitude test ID found in your enrollment. Please contact support."
+            }));
+            setCurrentStep('loading'); // Stay on loading to show error
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: "Invalid aptitude test ID found in your enrollment. Please contact support.",
+            });
+          }
+          setTestData(prev => ({ ...prev, isLoading: false, error: null })); // Ensure loading is false and error is cleared
+          return; // Stop here if incomplete tests are found
+        }
+
+        // 2. Check for enrollments requiring aptitude test assignment
+        const pendingAssignmentEnrollments = enrollments.filter((enrollment: any) =>
+          !enrollment.aptitudeTestCompleted && (!enrollment.aptitudeTestId || enrollment.aptitudeTestId === undefined)
+        );
+
+        console.log("Enrollments requiring aptitude test assignment:", pendingAssignmentEnrollments);
+
+        if (pendingAssignmentEnrollments.length > 0) {
+          console.log("Found enrollments requiring aptitude test assignment, moving to no-test step");
+          setPendingTests(pendingAssignmentEnrollments.map((e: any) => ({
+            type: 'aptitude',
+            name: `Aptitude Test ${e.subjectId?.displayName ? `for ${e.subjectId.displayName}` : ''}`,
+            id: null, // No ID yet, needs assignment
+            dueDate: null,
+            subjectId: e.subjectId?._id || e.subjectId,
+            subjectName: e.subjectId?.displayName || 'Subject'
+          })));
+          setCurrentStep('no-test');
+          setTestData(prev => ({ ...prev, isLoading: false, error: null })); // Ensure loading is false and error is cleared
+          return; // Stop here if assignments are pending
+        }
+
+        // 3. Check for completed but failed aptitude tests
+        const failedTestEnrollments = enrollments.filter((enrollment: any) =>
+          enrollment.aptitudeTestCompleted === true && enrollment.aptitudeTestPassed === false
+        );
+
+        console.log("Enrollments with completed but failed tests:", failedTestEnrollments);
+
+        if (failedTestEnrollments.length > 0) {
+          console.log("Found completed but failed tests. Staying on aptitude page.");
+
+          const formattedFailedTests = failedTestEnrollments.map((e: any) => {
+            let testId = e.aptitudeTestId;
+            if (typeof testId === 'object' && testId !== null && testId._id) {
+              testId = testId._id.toString();
+            } else if (testId) {
+              testId = testId.toString();
+            } else {
+              testId = null;
+            }
+
+            return {
               type: 'aptitude',
-              name: `Aptitude Test ${e.subjectId?.displayName ? `for ${e.subjectId.displayName}` : ''}`,
-              id: null,
-              dueDate: null,
+              name: `Aptitude Test for ${e.subjectId?.displayName || 'Subject'} (Failed)`,
+              id: testId,
+              status: 'Failed',
               subjectId: e.subjectId?._id || e.subjectId,
               subjectName: e.subjectId?.displayName || 'Subject'
-            })));
-            setCurrentStep('no-test');
+            };
+          });
+
+          setPendingTests(formattedFailedTests);
+          setTestData(prev => ({ ...prev, isLoading: false, error: null }));
+
+          // Set the selectedTest to the first failed test ID if available
+          if (formattedFailedTests.length > 0 && formattedFailedTests[0].id) {
+            console.log("Setting selected test to the first failed test:", formattedFailedTests[0].id);
+            setSelectedTest(formattedFailedTests[0].id);
+            setCurrentStep('intro'); // Show intro screen for failed test
           } else {
-            // Check if there are enrollments with aptitude tests that aren't completed
-            const incompleteTestEnrollments = enrollments.filter((enrollment) => 
-              !enrollment.aptitudeTestCompleted && enrollment.aptitudeTestId
-            );
-            
-            console.log("Enrollments with incomplete aptitude tests:", incompleteTestEnrollments);
-            
-            if (incompleteTestEnrollments.length > 0) {
-              // There are tests assigned but not completed
-              console.log("Enrollments found with assigned but incomplete tests");
-              
-              // Make sure we handle aptitudeTestId properly
-              const formattedTests = incompleteTestEnrollments.map(e => {
-                let testId = e.aptitudeTestId;
-                
-                // Handle if the ID is an object with _id property
-                if (typeof testId === 'object' && testId !== null && testId._id) {
-                  testId = testId._id.toString();
-                } else if (typeof testId === 'string') {
-                  // Keep it as is if it's already a string
-                } else if (testId) {
-                  // Try to stringify if it's something else but truthy
-                  testId = testId.toString();
-                } else {
-                  // Null/undefined case
-                  testId = null;
-                }
-                
-                return {
-                  type: 'aptitude',
-                  name: `Aptitude Test ${e.subjectId?.displayName ? `for ${e.subjectId.displayName}` : ''}`,
-                  id: testId,
-                  dueDate: null,
-                  subjectId: e.subjectId?._id || e.subjectId,
-                  subjectName: e.subjectId?.displayName || 'Subject'
-                };
-              });
-              
-              setPendingTests(formattedTests);
-              
-              if (formattedTests[0].id) {
-                console.log("Setting selected test to first incomplete test:", formattedTests[0].id);
-                setSelectedTest(formattedTests[0].id);
-                setCurrentStep('intro');
-              } else {
-                console.log("No test ID found, moving to no-test step");
-                setCurrentStep('no-test');
-              }
-            } else {
-              // --- NEW CHECK: Look for completed but failed tests ---
-              const failedTestEnrollments = enrollments.filter((enrollment) =>
-                enrollment.aptitudeTestCompleted === true && enrollment.aptitudeTestPassed === false
-              );
-              
-              console.log("Enrollments with completed but failed tests:", failedTestEnrollments);
-
-              if (failedTestEnrollments.length > 0) {
-                // Tests are completed, but at least one was failed. Stay on this page.
-                console.log("Found completed but failed tests. Staying on aptitude page.");
-                
-                const formattedFailedTests = failedTestEnrollments.map(e => {
-                   // Ensure we extract a usable ID string
-                   let testId = e.aptitudeTestId;
-                   if (typeof testId === 'object' && testId !== null && testId._id) {
-                     testId = testId._id.toString();
-                   } else if (testId) {
-                     testId = testId.toString();
-                   } else {
-                     testId = null; // Handle cases where ID might be missing
-                   }
-                   
-                   return {
-                     type: 'aptitude',
-                     name: `Aptitude Test for ${e.subjectId?.displayName || 'Subject'} (Failed)`,
-                     id: testId,
-                     status: 'Failed', // Add a status indicator
-                     subjectId: e.subjectId?._id || e.subjectId,
-                     subjectName: e.subjectId?.displayName || 'Subject'
-                   };
-                 });
-
-                 setPendingTests(formattedFailedTests);
-                 setTestData(prev => ({ ...prev, isLoading: false, error: null })); // Ensure loading is false and error is cleared
-                 
-                 // --- IMPORTANT: Set the selectedTest to the first failed test ID ---
-                 if (formattedFailedTests.length > 0 && formattedFailedTests[0].id) {
-                   console.log("Setting selected test to the first failed test:", formattedFailedTests[0].id);
-                   setSelectedTest(formattedFailedTests[0].id);
-                 } else {
-                    console.warn("Could not determine a valid ID for the failed test to display.");
-                    // Handle case where failed test ID is missing - maybe show a generic error?
-                    setTestData(prev => ({ ...prev, isLoading: false, error: "Could not load details for the failed test." }));
-                 }
-                 
-                 // Set step to intro AFTER setting selectedTest
-                 setCurrentStep('intro');
-                 
-                 toast({
-                   variant: "destructive",
-                   title: "Aptitude Test Failed",
-                   description: "You must pass all required aptitude tests to proceed.",
-                   duration: 5000,
-                 });
-
-              } else {
-                // --- ORIGINAL LOGIC: No incomplete AND no failed tests ---
-                // No pending tests at all, redirect to dashboard
-                console.log("No incomplete or failed tests found, redirecting to dashboard");
-                toast({
-                  title: "All Aptitude Tests Passed!",
-                  description: "Redirecting to your dashboard.",
-                  duration: 3000,
-                });
-                
-                // Delay to show the toast
-                setTimeout(() => {
-                  localStorage.setItem('redirect_count', '0'); // Reset the redirect counter
-                  router.push('/student/dashboard');
-                }, 3000);
-              }
-            }
+            console.warn("Could not determine a valid ID for the failed test to display.");
+            setTestData(prev => ({ ...prev, isLoading: false, error: "Could not load details for the failed test." }));
+            setCurrentStep('loading'); // Stay on loading to show error
           }
+
+          toast({
+            variant: "destructive",
+            title: "Aptitude Test Failed",
+            description: "You must pass all required aptitude tests to proceed.",
+            duration: 5000,
+          });
+          return; // Stop here if failed tests are found
         }
+
+        // 4. If none of the above, redirect to dashboard
+        console.log("No pending, incomplete, or failed aptitude tests found. Redirecting to dashboard.");
+        toast({
+          title: "All Aptitude Tests Passed!",
+          description: "Redirecting to your dashboard.",
+          duration: 3000,
+        });
+
+        setTimeout(() => {
+          localStorage.setItem('redirect_count', '0');
+          router.push('/student/dashboard');
+        }, 3000);
+
+        setTestData(prev => ({ ...prev, isLoading: false, error: null })); // Ensure loading is false and error is cleared
+
       } catch (error) {
-        console.error('Error fetching pending assessments:', error);
+        console.error('Error fetching student enrollments for aptitude test status:', error);
         setTestData({
           ...testData,
           isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to load pending assessments. Please try again later.'
+          error: error instanceof Error ? error.message : 'Failed to determine aptitude test status. Please try again later.'
         });
-        setCurrentStep('loading');
-        
+        setCurrentStep('loading'); // Stay on loading to show error
+
         toast({
           variant: "destructive",
           title: "Error",
-          description: error instanceof Error ? error.message : "Failed to load aptitude tests. Please try again later.",
+          description: error instanceof Error ? error.message : "Failed to load aptitude test status. Please try again later.",
         });
       }
     };

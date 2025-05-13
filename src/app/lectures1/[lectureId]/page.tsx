@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import LectureView from '../../(student)/lectures/[lectureId]/LectureView';
+import LectureView from '../../(student)/lectures/[lectureId]1/LectureView';
 import { getLectureById, getLectureDetails, updateLectureProgress } from '../../(student)/lectures/api/lecture-service';
 
 export default function LecturePage() {
