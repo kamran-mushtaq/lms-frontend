@@ -31,13 +31,13 @@ export default function AdminPanelLayout({
   return (
     <>
       {/* <Sidebar /> */}
-      <div className="container mx-auto">
+      <div className="container-fuild mx-auto">
       <ContentLayout title="Attribute Types Management"><span></span></ContentLayout>
       <div className="p-2 bg-background">
         {isLoading && <Preloader />}
         <main
           className={cn(
-            `min-h-[calc(100vh_-_52px)]  shadow-md shadow-black/5 dark:border-muted-background dark:bg-dashboard-background bg-muted border-r dark:border transition-[margin-left] ease-in-out duration-300 rounded-2xl ${
+            `min-h-[calc(100vh_-_52px)] shadow-md shadow-black/5 dark:border-muted-background dark:bg-dashboard-background bg-muted border-r dark:border transition-[margin-left] ease-in-out duration-300 rounded-2xl ${
               isLoading ? "blur-sm" : ""
             }`,
             !settings.disabled &&

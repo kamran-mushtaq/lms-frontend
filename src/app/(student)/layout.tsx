@@ -1,6 +1,7 @@
 
 
 import { AuthProvider } from "@/contexts/AuthContext"; // Import the AuthProvider
+import AdminPanelLayout from "@/components/admin-panel/admin-panel-other-layout";
 
 export default function StudentLayout({
   children
@@ -9,7 +10,10 @@ export default function StudentLayout({
 }) {
   return (
     <AuthProvider>
+      <AdminPanelLayout>
       {children}
+
+      </AdminPanelLayout>
     </AuthProvider>
   );
 }

@@ -15,6 +15,11 @@ import {
 } from "../ui/breadcrumb";
 import { GlobalSearch } from "../GlobalSearch";
 
+import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import Image from "next/image";
+
+
 import Link from "next/link"
 import { useState } from "react"
 import { ChevronDown, Menu, User, X } from "lucide-react"
@@ -44,108 +49,84 @@ export function Navbar({ title }: NavbarProps) {
     { name: "Progress", link: "/Progress" }
   ];
 
- 
+
 
   return (
-    <div className="py-4 md:py-6">
-      <header className="rounded-full bg-white/90 backdrop-blur-sm px-4 py-3 shadow-lg md:px-6 md:py-4 dark:bg-muted">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="rounded-md bg-blue-500 p-1">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-5 w-5 text-white"
-              >
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold text-gray-800">Gradient</span>
-          </div>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:block">
-            <ul className="flex space-x-8">
-              {menuItems.map((item) => (
-                <li key={item.name}>
-                  <Link
-                    href={item.link}
-                    className="text-sm font-medium text-gray-600 dark:text-white transition-colors hover:text-blue-600"
-                  >
-                    {item.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-
-          {/* Desktop Login Card */}
-          <div className="hidden lg:block">
-            <div className="relative">
-              {/* <ModeToggle /> */}
-              <UserNav />
-            </div>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="rounded-md p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
-          >
-            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="mt-4 border-t border-gray-100 pt-4 lg:hidden">
-            <nav className="flex flex-col space-y-4">
-              {menuItems.map((item) => (
-                <div key={item.name}>
-                  <Link
-                    href={item.link}
-                    className="block text-sm font-medium text-gray-700 py-2"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    {item.name}
-                  </Link>
+    <div className="bg-gradient-to-br p-1">
+      <div className="w-full max-w-9xl mx-auto px-4 pt-4 sm:px-6 lg:px-8">
+        <header className="rounded-full backdrop-blur-md bg-blue dark:bg-slate-900 border border-white/40 dark:border-gray-800/40 shadow-lg">
+          <div className="flex h-16 items-center justify-between px-6">
+            <div className="flex items-center gap-2">
+              <Link href="/" className="flex items-center gap-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-600 text-white">
+                  <span className="font-semibold">LMS</span>
                 </div>
+                <span className="text-lg font-semibold">
+                 
+                 </span>
+              </Link>
+            </div>
+
+            <nav className="hidden md:flex items-center gap-6">
+              {menuItems.map((item, index) => (
+                <Link
+                  key={index}
+                  href={item.link}
+                  className="text-sm font-medium hover:text-sky-600 dark:hover:text-sky-400"
+                >
+                  {item.name}
+                </Link>
               ))}
             </nav>
-            <div className="mt-6">
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
-                <h3 className="mb-3 text-sm font-medium text-gray-900">Account Login</h3>
-                <div className="space-y-3">
-                  <input
-                    type="email"
-                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Email"
-                  />
-                  <input
-                    type="password"
-                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Password"
-                  />
-                  <button
-                    type="submit"
-                    className="flex w-full justify-center rounded-md bg-blue-500 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  >
-                    Sign in
-                  </button>
-                </div>
-              </div>
+
+            <div className="hidden md:flex items-center gap-2">
+              <ModeToggle />
+              <UserNav />
+
             </div>
+
+            <Sheet>
+              <SheetTrigger asChild className="md:hidden">
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right">
+                <div className="flex flex-col gap-6 py-6">
+
+                  {menuItems.map((item, index) => (
+                    <Link
+                      key={index}
+                      href={item.link}
+                      className="text-sm font-medium hover:text-sky-600 dark:hover:text-sky-400"
+                    >
+                      {item.name}
+                    </Link>
+                  ))}
+                 
+                  <div className="flex flex-col gap-2 mt-4">
+                    <Link href="/login">
+                      <Button variant="outline" size="sm" className="w-full">
+                        Login
+                      </Button>
+                    </Link>
+                    <Link href="/register">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="w-full bg-sky-600 hover:bg-sky-700 dark:bg-sky-600 dark:hover:bg-sky-700"
+                      >
+                        Register
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
-        )}
-      </header>
+        </header>
+      </div>
     </div>
   );
 }

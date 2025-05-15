@@ -1,26 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { 
-  Play, 
-  Pause, 
-  Volume2, 
-  VolumeX, 
-  Maximize, 
-  Minimize,
-  SkipForward, 
-  SkipBack,
-  Settings,
-  Loader2
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { useState, useEffect, useRef } from 'react';
 
 interface VideoPlayerWithProgressProps {
   videoUrl?: string;
@@ -29,496 +9,288 @@ interface VideoPlayerWithProgressProps {
   poster?: string;
 }
 
-const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-
 export default function VideoPlayerWithProgress({
   videoUrl,
   initialProgress = 0,
   onProgressUpdate,
   poster
 }: VideoPlayerWithProgressProps) {
-  // Video state
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [buffering, setBuffering] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(initialProgress);
   
-  // Audio state
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
-  const [previousVolume, setPreviousVolume] = useState(1);
+  // Track if seeking is in progress
+  const [isSeeking, setIsSeeking] = useState(false);
   
-  // UI state
-  const [showControls, setShowControls] = useState(true);
-  const [isDragging, setIsDragging] = useState(false);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  // Progress reporting interval
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Refs
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const progressUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Format time helper
-  const formatTime = useCallback((timeInSeconds: number) => {
-    if (!isFinite(timeInSeconds)) return '0:00';
-    
-    const hours = Math.floor(timeInSeconds / 3600);
-    const minutes = Math.floor((timeInSeconds % 3600) / 60);
-    const seconds = Math.floor(timeInSeconds % 60);
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }, []);
-  
-  // Set up initial progress
+  // Initialize video when URL changes
   useEffect(() => {
-    if (videoRef.current && duration > 0 && initialProgress > 0 && !isDragging) {
-      const targetTime = (initialProgress / 100) * duration;
-      if (Math.abs(videoRef.current.currentTime - targetTime) > 5) {
-        videoRef.current.currentTime = targetTime;
-        setCurrentTime(targetTime);
-      }
-    }
-  }, [duration, initialProgress, isDragging]);
-  
-  // Auto-hide controls
-  useEffect(() => {
-    const resetControlsTimeout = () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-      setShowControls(true);
-      controlsTimeoutRef.current = setTimeout(() => {
-        if (isPlaying && !isDragging) {
-          setShowControls(false);
-        }
-      }, 3000);
-    };
-
-    resetControlsTimeout();
-    return () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-    };
-  }, [isPlaying, isDragging]);
-  
-  // Progress update interval
-  useEffect(() => {
-    if (isPlaying && onProgressUpdate && duration > 0) {
-      progressUpdateIntervalRef.current = setInterval(() => {
-        if (videoRef.current && !isDragging) {
-          const progress = (videoRef.current.currentTime / duration) * 100;
-          onProgressUpdate(progress, videoRef.current.currentTime);
-        }
-      }, 5000); // Update every 5 seconds
-    } else {
-      if (progressUpdateIntervalRef.current) {
-        clearInterval(progressUpdateIntervalRef.current);
-      }
-    }
-    
-    return () => {
-      if (progressUpdateIntervalRef.current) {
-        clearInterval(progressUpdateIntervalRef.current);
-      }
-    };
-  }, [isPlaying, onProgressUpdate, duration, isDragging]);
-  
-  // Video event handlers
-  const handleMetadataLoaded = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-      setError(null);
-    }
-  };
-  
-  const handleTimeUpdate = () => {
-    if (videoRef.current && !isDragging) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
-  };
-  
-  const handlePlay = () => {
-    setIsPlaying(true);
-    setError(null);
-  };
-  
-  const handlePause = () => {
-    setIsPlaying(false);
-  };
-  
-  const handleWaiting = () => {
-    setBuffering(true);
-  };
-  
-  const handleCanPlay = () => {
-    setBuffering(false);
-    setIsLoading(false);
-  };
-  
-  const handleEnded = () => {
-    setIsPlaying(false);
-    // Report 100% completion
-    if (onProgressUpdate) {
-      onProgressUpdate(100, duration);
-    }
-  };
-  
-  const handleError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
-    const target = e.target as HTMLVideoElement;
-    setError(`Video error: ${target.error?.message || 'Unknown error'}`);
-    setIsLoading(false);
-    setBuffering(false);
-  };
-  
-  const handleLoadStart = () => {
     setIsLoading(true);
     setError(null);
-  };
-  
-  // Control handlers
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (error) {
-        // Try to reload the video if there was an error
-        videoRef.current.load();
-        return;
-      }
-      
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play().catch(err => {
-          console.error('Play failed:', err);
-          setError('Failed to play video');
-        });
-      }
-    }
-  };
-  
-  const handleVolumeChange = (values: number[]) => {
-    const newVolume = values[0];
-    setVolume(newVolume);
     
-    if (videoRef.current) {
-      videoRef.current.volume = newVolume;
-      videoRef.current.muted = newVolume === 0;
-      setIsMuted(newVolume === 0);
+    if (!videoUrl) {
+      setError('No video URL provided');
+      setIsLoading(false);
+      return;
     }
-  };
-  
-  const toggleMute = () => {
-    if (videoRef.current) {
-      if (isMuted) {
-        // Unmute - restore previous volume
-        const volumeToRestore = previousVolume > 0 ? previousVolume : 0.5;
-        setVolume(volumeToRestore);
-        videoRef.current.volume = volumeToRestore;
-        videoRef.current.muted = false;
-        setIsMuted(false);
-      } else {
-        // Mute - save current volume
-        setPreviousVolume(volume);
-        setVolume(0);
-        videoRef.current.volume = 0;
-        videoRef.current.muted = true;
-        setIsMuted(true);
-      }
-    }
-  };
-  
-  const handleSeek = (values: number[]) => {
-    const newTime = values[0];
-    setCurrentTime(newTime);
     
-    if (videoRef.current) {
-      videoRef.current.currentTime = newTime;
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    
+    // Set up event listeners
+    const handleLoadedMetadata = () => {
+      setDuration(videoElement.duration);
+      setIsLoading(false);
       
-      // Report progress immediately when seeking
-      if (onProgressUpdate && duration > 0) {
-        const progress = (newTime / duration) * 100;
-        onProgressUpdate(progress, newTime);
+      // Set initial playback position based on progress
+      if (initialProgress > 0 && initialProgress < 100) {
+        const seekTime = (initialProgress / 100) * videoElement.duration;
+        videoElement.currentTime = seekTime;
+        setCurrentTime(seekTime);
       }
-    }
-  };
-  
-  const skip = (seconds: number) => {
-    if (videoRef.current) {
-      const newTime = Math.max(0, Math.min(duration, videoRef.current.currentTime + seconds));
-      videoRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
-    }
-  };
-  
-  const handlePlaybackRateChange = (rate: number) => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = rate;
-      setPlaybackRate(rate);
-    }
-  };
-  
-  // Fullscreen handlers
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(err => {
-        console.error('Error entering fullscreen:', err);
-      });
-    } else {
-      document.exitFullscreen().catch(err => {
-        console.error('Error exiting fullscreen:', err);
-      });
-    }
-  };
-  
-  // Listen for fullscreen changes
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
     };
     
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    const handleError = () => {
+      setError('Failed to load video');
+      setIsLoading(false);
     };
-  }, []);
-  
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target === document.body || (e.target as HTMLElement).closest('.video-container')) {
-        switch (e.code) {
-          case 'Space':
-            e.preventDefault();
-            togglePlay();
-            break;
-          case 'KeyF':
-            e.preventDefault();
-            toggleFullscreen();
-            break;
-          case 'KeyM':
-            e.preventDefault();
-            toggleMute();
-            break;
-          case 'ArrowLeft':
-            e.preventDefault();
-            skip(-10);
-            break;
-          case 'ArrowRight':
-            e.preventDefault();
-            skip(10);
-            break;
-          case 'ArrowUp':
-            e.preventDefault();
-            setVolume(v => Math.min(1, v + 0.1));
-            break;
-          case 'ArrowDown':
-            e.preventDefault();
-            setVolume(v => Math.max(0, v - 0.1));
-            break;
+    
+    const handleTimeUpdate = () => {
+      if (!isSeeking) {
+        setCurrentTime(videoElement.currentTime);
+        
+        // Calculate progress percentage
+        if (videoElement.duration) {
+          const newProgress = (videoElement.currentTime / videoElement.duration) * 100;
+          setProgress(newProgress);
         }
       }
     };
     
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      // Auto-set to 100% complete when video ends
+      setProgress(100);
+      onProgressUpdate?.(100, videoElement.currentTime);
     };
-  }, []);
+    
+    videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+    videoElement.addEventListener('error', handleError);
+    videoElement.addEventListener('timeupdate', handleTimeUpdate);
+    videoElement.addEventListener('ended', handleEnded);
+    
+    // Clean up event listeners
+    return () => {
+      videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      videoElement.removeEventListener('error', handleError);
+      videoElement.removeEventListener('timeupdate', handleTimeUpdate);
+      videoElement.removeEventListener('ended', handleEnded);
+      
+      // Clear any intervals
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, [videoUrl, initialProgress, onProgressUpdate]);
   
-  // Render
+  // Set up progress reporting interval when playing
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    
+    if (isPlaying) {
+      // Report progress every 5 seconds while playing
+      progressIntervalRef.current = setInterval(() => {
+        const newProgress = (videoElement.currentTime / videoElement.duration) * 100;
+        onProgressUpdate?.(newProgress, videoElement.currentTime);
+      }, 5000);
+    } else {
+      // Clear interval when paused
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, [isPlaying, onProgressUpdate]);
+  
+  // Handle play/pause
+  const togglePlayPause = () => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    
+    if (isPlaying) {
+      videoElement.pause();
+      setIsPlaying(false);
+      
+      // Report progress when paused
+      const newProgress = (videoElement.currentTime / videoElement.duration) * 100;
+      onProgressUpdate?.(newProgress, videoElement.currentTime);
+    } else {
+      videoElement.play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch(err => {
+          console.error('Error playing video:', err);
+          setError('Failed to play video. Please try again.');
+        });
+    }
+  };
+  
+  // Handle seeking
+  const handleSeek = (newTime: number) => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    
+    setIsSeeking(true);
+    videoElement.currentTime = newTime;
+    setCurrentTime(newTime);
+    
+    // Calculate and update progress
+    const newProgress = (newTime / videoElement.duration) * 100;
+    setProgress(newProgress);
+    
+    // Report new progress
+    onProgressUpdate?.(newProgress, newTime);
+    
+    setIsSeeking(false);
+  };
+  
+  // Format time (seconds) to mm:ss
+  const formatTime = (timeInSeconds: number) => {
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+  
+  // Handle volume change
+  const handleVolumeChange = (newVolume: number) => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    
+    videoElement.volume = newVolume;
+    setVolume(newVolume);
+  };
+  
   return (
-    <div 
-      ref={containerRef}
-      className="video-container relative w-full h-full bg-black overflow-hidden cursor-none group"
-      onMouseMove={() => setShowControls(true)}
-      onMouseLeave={() => !isPlaying || setShowControls(false)}
-    >
+    <div className="relative w-full h-full">
+      {/* Video element */}
       <video
         ref={videoRef}
-        className="w-full h-full"
         src={videoUrl}
+        className="w-full h-full object-contain"
         poster={poster}
-        onLoadedMetadata={handleMetadataLoaded}
-        onTimeUpdate={handleTimeUpdate}
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onWaiting={handleWaiting}
-        onCanPlay={handleCanPlay}
-        onEnded={handleEnded}
-        onError={handleError}
-        onLoadStart={handleLoadStart}
         preload="metadata"
         playsInline
       />
       
-      {/* Loading/Buffering indicator */}
-      {(isLoading || buffering) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-          <div className="flex items-center gap-3 text-white">
-            <Loader2 className="h-8 w-8 animate-spin" />
-            <span className="text-lg">
-              {isLoading ? 'Loading...' : 'Buffering...'}
-            </span>
-          </div>
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
         </div>
       )}
       
-      {/* Error state */}
+      {/* Error overlay */}
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-          <div className="text-center text-white">
-            <p className="text-lg mb-4">{error}</p>
-            <Button onClick={togglePlay} variant="outline">
-              Try Again
-            </Button>
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 text-white p-4">
+          <div className="text-center">
+            <p className="text-red-400 mb-2">Error: {error}</p>
+            <button 
+              className="px-4 py-2 bg-primary text-white rounded-md"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </button>
           </div>
         </div>
       )}
       
-      {/* Center play button when paused */}
-      {!isPlaying && !isLoading && !buffering && !error && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Button
-            size="lg"
-            className="h-20 w-20 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-sm"
-            onClick={togglePlay}
-          >
-            <Play className="h-8 w-8 text-white fill-white" />
-          </Button>
-        </div>
-      )}
-      
-      {/* Controls */}
-      <div 
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 transition-opacity duration-300 ${
-          showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
+      {/* Controls overlay */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
         {/* Progress bar */}
-        <div className="mb-4">
-          <Slider
-            value={[currentTime]}
-            max={duration || 100}
-            step={0.1}
-            onValueChange={handleSeek}
-            onValueCommit={(values) => {
-              setIsDragging(false);
-              handleSeek(values);
-            }}
-            onPointerDown={() => setIsDragging(true)}
-            className="h-2 cursor-pointer [&>[role=slider]]:h-4 [&>[role=slider]]:w-4"
-            rangeClassName="bg-white"
-            thumbClassName="bg-white border-2 border-white/50"
-          />
+        <div className="relative w-full h-1 bg-gray-600 rounded-full mb-2 cursor-pointer"
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const position = (e.clientX - rect.left) / rect.width;
+            handleSeek(position * duration);
+          }}
+        >
+          <div 
+            className="absolute top-0 left-0 h-full bg-primary rounded-full"
+            style={{ width: `${progress}%` }}
+          ></div>
         </div>
         
         {/* Control buttons */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Skip back */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white hover:bg-white/20"
-              onClick={() => skip(-10)}
+          <div className="flex items-center gap-4">
+            {/* Play/Pause button */}
+            <button 
+              className="text-white focus:outline-none"
+              onClick={togglePlayPause}
             >
-              <SkipBack className="h-6 w-6" />
-            </Button>
+              {isPlaying ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="6" y="4" width="4" height="16"></rect>
+                  <rect x="14" y="4" width="4" height="16"></rect>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              )}
+            </button>
             
-            {/* Play/Pause */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white hover:bg-white/20"
-              onClick={togglePlay}
-            >
-              {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-            </Button>
-            
-            {/* Skip forward */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white hover:bg-white/20"
-              onClick={() => skip(10)}
-            >
-              <SkipForward className="h-6 w-6" />
-            </Button>
-            
-            {/* Volume controls */}
+            {/* Volume control */}
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-white hover:bg-white/20"
-                onClick={toggleMute}
+              <button 
+                className="text-white focus:outline-none"
+                onClick={() => handleVolumeChange(volume === 0 ? 1 : 0)}
               >
-                {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-              </Button>
-              
-              <div className="w-20">
-                <Slider
-                  value={[isMuted ? 0 : volume]}
-                  max={1}
-                  step={0.05}
-                  onValueChange={handleVolumeChange}
-                  className="h-1 cursor-pointer [&>[role=slider]]:h-3 [&>[role=slider]]:w-3"
-                  rangeClassName="bg-white"
-                  thumbClassName="bg-white"
-                />
-              </div>
+                {volume === 0 ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+                    <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                  </svg>
+                )}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={volume}
+                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                className="w-16 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer"
+              />
             </div>
-            
-            {/* Time display */}
-            <span className="text-white text-sm font-mono">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
           </div>
           
-          <div className="flex items-center gap-2">
-            {/* Playback rate */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white hover:bg-white/20"
-                >
-                  <Settings className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                  Playback Speed
-                </div>
-                {PLAYBACK_RATES.map((rate) => (
-                  <DropdownMenuItem
-                    key={rate}
-                    onClick={() => handlePlaybackRateChange(rate)}
-                    className={playbackRate === rate ? "bg-accent" : ""}
-                  >
-                    {rate}x {playbackRate === rate && "✓"}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
-            {/* Fullscreen */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white hover:bg-white/20"
-              onClick={toggleFullscreen}
-            >
-              {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-            </Button>
+          {/* Time display */}
+          <div className="text-white text-sm">
+            {formatTime(currentTime)} / {formatTime(duration)}
           </div>
         </div>
       </div>

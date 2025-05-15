@@ -1,35 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from 'react';
+import { Note } from '../hooks/useNotes';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
-  BookOpen, 
+  Search, 
   Plus, 
-  Edit2, 
-  Trash2, 
-  Clock, 
+  Edit, 
+  Trash, 
   AlertCircle,
-  Search,
-  Bookmark,
-  Tag
+  Clock, 
+  Tag,
+  Save,
+  X
 } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
-import { createNote, updateNote, deleteNote } from '../../api/notes-service';
+import { Badge } from "@/components/ui/badge";
+import { format } from 'date-fns';
 
-interface Note {
-  _id: string;
-  content: string;
-  timestamp?: number;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+// Import API services (assuming we have these)
+import { createNote, updateNote, deleteNote } from '../../api/notes-service';
 
 interface NotesPanelProps {
   notes: Note[];
@@ -37,7 +29,6 @@ interface NotesPanelProps {
   error: string | null;
   lectureId: string;
   onNotesUpdate: () => void;
-  currentVideoTime?: number;
 }
 
 export default function NotesPanel({
@@ -45,411 +36,422 @@ export default function NotesPanel({
   loading,
   error,
   lectureId,
-  onNotesUpdate,
-  currentVideoTime = 0
+  onNotesUpdate
 }: NotesPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   
   // Form state
-  const [noteContent, setNoteContent] = useState('');
-  const [noteTimestamp, setNoteTimestamp] = useState<number | undefined>(undefined);
-  const [noteTags, setNoteTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [newNoteTags, setNewNoteTags] = useState('');
+  const [editNoteContent, setEditNoteContent] = useState('');
+  const [editNoteTags, setEditNoteTags] = useState('');
   
-  const { toast } = useToast();
-
-  // Filter notes based on search
-  const filteredNotes = notes.filter(note => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      note.content.toLowerCase().includes(searchLower) ||
-      note.tags.some(tag => tag.toLowerCase().includes(searchLower))
-    );
-  });
-
-  // Format time helper
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Format date helper
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Reset form
-  const resetForm = () => {
-    setNoteContent('');
-    setNoteTimestamp(undefined);
-    setNoteTags([]);
-    setTagInput('');
-    setSelectedNote(null);
-    setIsEditing(false);
-  };
-
-  // Open new note dialog
-  const openNewNoteDialog = () => {
-    resetForm();
-    setNoteTimestamp(currentVideoTime);
-    setIsDialogOpen(true);
-  };
-
-  // Open edit note dialog
-  const openEditNoteDialog = (note: Note) => {
-    setSelectedNote(note);
-    setNoteContent(note.content);
-    setNoteTimestamp(note.timestamp);
-    setNoteTags(note.tags);
-    setIsEditing(true);
-    setIsDialogOpen(true);
-  };
-
-  // Handle tag input
-  const handleTagAdd = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      const newTag = tagInput.trim().toLowerCase();
-      if (!noteTags.includes(newTag)) {
-        setNoteTags([...noteTags, newTag]);
-      }
-      setTagInput('');
-    }
-  };
-
-  // Remove tag
-  const removeTag = (tagToRemove: string) => {
-    setNoteTags(noteTags.filter(tag => tag !== tagToRemove));
-  };
-
-  // Save note
-  const handleSave = async () => {
-    if (!noteContent.trim()) {
-      toast({
-        title: "Note Required",
-        description: "Please enter some content for your note.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setSaving(true);
+  // Operation states
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [operationError, setOperationError] = useState<string | null>(null);
+  
+  // Filter notes by search query
+  const filteredNotes = searchQuery
+    ? notes.filter(note => 
+        note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        note.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : notes;
+  
+  // Handle create note
+  const handleCreateNote = async () => {
+    if (!newNoteContent.trim()) return;
+    
     try {
-      const noteData = {
-        content: noteContent.trim(),
-        timestamp: noteTimestamp,
-        tags: noteTags
-      };
-
-      if (isEditing && selectedNote) {
-        await updateNote(selectedNote._id, noteData);
-        toast({
-          title: "Note Updated",
-          description: "Your note has been updated successfully.",
-        });
-      } else {
-        await createNote(lectureId, noteData);
-        toast({
-          title: "Note Created",
-          description: "Your note has been created successfully.",
-        });
-      }
-
-      setIsDialogOpen(false);
-      resetForm();
+      setIsSaving(true);
+      setOperationError(null);
+      
+      // Process tags from comma-separated string
+      const tags = newNoteTags.split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+      
+      // Call API to create note
+      await createNote({
+        lectureId,
+        content: newNoteContent,
+        tags,
+        timestamp: getCurrentVideoTime() // Implement this function to get current video time
+      });
+      
+      // Reset form
+      setNewNoteContent('');
+      setNewNoteTags('');
+      setIsCreating(false);
+      
+      // Refresh notes list
       onNotesUpdate();
     } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err.message || "Failed to save note.",
-        variant: "destructive"
-      });
+      console.error('Error creating note:', err);
+      setOperationError(err.message || 'Failed to create note');
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
-
-  // Delete note
-  const handleDelete = async (noteId: string) => {
-    setDeleting(noteId);
+  
+  // Handle update note
+  const handleUpdateNote = async (noteId: string) => {
+    if (!editNoteContent.trim()) return;
+    
     try {
+      setIsSaving(true);
+      setOperationError(null);
+      
+      // Process tags from comma-separated string
+      const tags = editNoteTags.split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+      
+      // Call API to update note
+      await updateNote(noteId, {
+        content: editNoteContent,
+        tags
+      });
+      
+      // Reset edit state
+      setEditingNoteId(null);
+      
+      // Refresh notes list
+      onNotesUpdate();
+    } catch (err: any) {
+      console.error('Error updating note:', err);
+      setOperationError(err.message || 'Failed to update note');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  // Handle delete note
+  const handleDeleteNote = async (noteId: string) => {
+    try {
+      setIsDeleting(true);
+      setOperationError(null);
+      
+      // Call API to delete note
       await deleteNote(noteId);
-      toast({
-        title: "Note Deleted",
-        description: "Your note has been deleted successfully.",
-      });
+      
+      // Refresh notes list
       onNotesUpdate();
     } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err.message || "Failed to delete note.",
-        variant: "destructive"
-      });
+      console.error('Error deleting note:', err);
+      setOperationError(err.message || 'Failed to delete note');
     } finally {
-      setDeleting(null);
+      setIsDeleting(false);
     }
   };
-
+  
+  // Start editing a note
+  const startEditingNote = (note: Note) => {
+    setEditingNoteId(note._id);
+    setEditNoteContent(note.content);
+    setEditNoteTags(note.tags.join(', '));
+  };
+  
+  // Cancel editing or creating
+  const cancelOperation = () => {
+    setIsCreating(false);
+    setEditingNoteId(null);
+    setNewNoteContent('');
+    setNewNoteTags('');
+    setEditNoteContent('');
+    setEditNoteTags('');
+    setOperationError(null);
+  };
+  
+  // Helper function to get current video time (to be implemented)
+  const getCurrentVideoTime = () => {
+    // This would need to be connected to your video player component
+    // For now, we'll return the current timestamp
+    return Math.floor(Date.now() / 1000);
+  };
+  
+  // Format timestamp to readable time
+  const formatTimestamp = (timestamp?: number) => {
+    if (!timestamp) return '';
+    
+    const minutes = Math.floor(timestamp / 60);
+    const seconds = Math.floor(timestamp % 60);
+    
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+  
+  // Format date to readable format
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'MMM d, yyyy h:mm a');
+    } catch (e) {
+      return dateString;
+    }
+  };
+  
   // Loading state
   if (loading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            Notes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-            <span className="ml-3 text-muted-foreground">Loading notes...</span>
+        <CardContent className="p-6">
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mb-4"></div>
+            <p className="text-sm text-muted-foreground">Loading notes...</p>
           </div>
         </CardContent>
       </Card>
     );
   }
-
+  
   // Error state
   if (error) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            Notes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3 text-destructive">
-            <AlertCircle className="h-6 w-6" />
-            <span>{error}</span>
+        <CardContent className="p-6">
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="rounded-full bg-red-100 p-3 w-10 h-10 flex items-center justify-center mb-4">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+            </div>
+            <p className="text-sm text-muted-foreground mb-2">Failed to load notes</p>
+            <p className="text-xs text-muted-foreground mb-4">{error}</p>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
           </div>
         </CardContent>
       </Card>
     );
   }
-
+  
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            Notes
-            <Badge variant="secondary">
-              {notes.length}
-            </Badge>
-          </CardTitle>
+      <CardContent className="p-6">
+        {/* Header with search and create button */}
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search notes..."
+              className="pl-9"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              disabled={isCreating || !!editingNoteId}
+            />
+          </div>
           
-          <Button onClick={openNewNoteDialog} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Add Note
-          </Button>
+          {!isCreating && !editingNoteId && (
+            <Button 
+              size="sm" 
+              onClick={() => setIsCreating(true)}
+              className="flex items-center gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              Add Note
+            </Button>
+          )}
         </div>
         
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-      </CardHeader>
-      
-      <CardContent>
-        {notes.length === 0 ? (
-          <div className="text-center py-8">
-            <BookOpen className="h-12 w-12 mx-auto text-muted-foreground opacity-20 mb-4" />
-            <p className="text-muted-foreground mb-4">No notes yet.</p>
-            <Button onClick={openNewNoteDialog} variant="outline">
-              Create your first note
-            </Button>
+        {/* Operation error message */}
+        {operationError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4 text-sm">
+            {operationError}
           </div>
-        ) : (
-          <ScrollArea className="h-96">
-            <div className="space-y-3">
-              {filteredNotes.map((note) => (
-                <div
-                  key={note._id}
-                  className="p-3 rounded-lg border hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {note.timestamp !== undefined && (
-                        <Badge variant="outline" className="text-xs">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {formatTime(note.timestamp)}
-                        </Badge>
-                      )}
-                      {note.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          <Tag className="h-3 w-3 mr-1" />
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                    
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => openEditNoteDialog(note)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(note._id)}
-                        disabled={deleting === note._id}
-                      >
-                        {deleting === note._id ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-destructive"></div>
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <p className="text-sm leading-relaxed mb-2">{note.content}</p>
-                  
-                  <p className="text-xs text-muted-foreground">
-                    {formatDate(note.createdAt)}
-                    {note.updatedAt !== note.createdAt && ' (edited)'}
-                  </p>
-                </div>
-              ))}
-              
-              {filteredNotes.length === 0 && searchQuery && (
-                <div className="text-center py-8">
-                  <Search className="h-12 w-12 mx-auto text-muted-foreground opacity-20 mb-4" />
-                  <p className="text-muted-foreground">
-                    No notes found for "{searchQuery}"
-                  </p>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
         )}
-      </CardContent>
-
-      {/* Add/Edit Note Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {isEditing ? 'Edit Note' : 'Add New Note'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {/* Note content */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Note</label>
-              <Textarea
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-                placeholder="Enter your note..."
-                rows={4}
-              />
-            </div>
-            
-            {/* Timestamp */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Timestamp</label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  value={noteTimestamp || ''}
-                  onChange={(e) => setNoteTimestamp(Number(e.target.value) || undefined)}
-                  placeholder="Seconds"
-                  className="flex-1"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setNoteTimestamp(currentVideoTime)}
-                >
-                  Current Time
-                </Button>
-              </div>
-              {noteTimestamp !== undefined && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatTime(noteTimestamp)}
-                </p>
-              )}
-            </div>
-            
-            {/* Tags */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Tags</label>
-              <Input
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagAdd}
-                placeholder="Type a tag and press Enter"
-              />
-              {noteTags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {noteTags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="secondary"
-                      className="cursor-pointer"
-                      onClick={() => removeTag(tag)}
-                    >
-                      {tag}
-                      <Trash2 className="h-3 w-3 ml-1" />
-                    </Badge>
-                  ))}
+        
+        {/* Create note form */}
+        {isCreating && (
+          <Card className="mb-4 border-primary/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Add New Note</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Textarea
+                    placeholder="Enter your note..."
+                    className="min-h-[100px]"
+                    value={newNoteContent}
+                    onChange={(e) => setNewNoteContent(e.target.value)}
+                  />
                 </div>
-              )}
-            </div>
-            
-            {/* Actions */}
-            <div className="flex justify-end gap-2 pt-4">
+                <div>
+                  <div className="flex items-center mb-2">
+                    <Tag className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Tags (comma-separated)</span>
+                  </div>
+                  <Input
+                    placeholder="e.g. important, review, question"
+                    value={newNoteTags}
+                    onChange={(e) => setNewNoteTags(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2">
               <Button
                 variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-                disabled={saving}
+                size="sm"
+                onClick={cancelOperation}
+                disabled={isSaving}
               >
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? (
+              <Button
+                size="sm"
+                onClick={handleCreateNote}
+                disabled={!newNoteContent.trim() || isSaving}
+              >
+                {isSaving ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    <div className="animate-spin h-4 w-4 mr-2 border-2 border-t-transparent rounded-full" />
                     Saving...
                   </>
                 ) : (
-                  isEditing ? 'Update' : 'Save'
+                  <>
+                    <Save className="h-4 w-4 mr-1" />
+                    Save Note
+                  </>
                 )}
               </Button>
-            </div>
+            </CardFooter>
+          </Card>
+        )}
+        
+        {/* Notes list */}
+        {!isCreating && filteredNotes.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground mb-2">
+              {searchQuery ? `No notes matching "${searchQuery}"` : "No notes yet"}
+            </p>
+            {!searchQuery && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsCreating(true)}
+                className="mt-2"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create your first note
+              </Button>
+            )}
           </div>
-        </DialogContent>
-      </Dialog>
+        ) : (
+          <div className="space-y-4">
+            {filteredNotes.map((note) => (
+              <Card key={note._id} className="overflow-hidden">
+                {editingNoteId === note._id ? (
+                  <>
+                    <CardContent className="p-4">
+                      <div className="space-y-4">
+                        <div>
+                          <Textarea
+                            className="min-h-[100px]"
+                            value={editNoteContent}
+                            onChange={(e) => setEditNoteContent(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <div className="flex items-center mb-2">
+                            <Tag className="h-4 w-4 mr-2 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Tags</span>
+                          </div>
+                          <Input
+                            placeholder="e.g. important, review, question"
+                            value={editNoteTags}
+                            onChange={(e) => setEditNoteTags(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2 bg-muted/50 px-4 py-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={cancelOperation}
+                        disabled={isSaving}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleUpdateNote(note._id)}
+                        disabled={!editNoteContent.trim() || isSaving}
+                      >
+                        {isSaving ? (
+                          <>
+                            <div className="animate-spin h-4 w-4 mr-2 border-2 border-t-transparent rounded-full" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-1" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  </>
+                ) : (
+                  <>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {note.timestamp && (
+                            <div className="flex items-center text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {formatTimestamp(note.timestamp)}
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(note.createdAt)}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => startEditingNote(note)}
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive"
+                            onClick={() => handleDeleteNote(note._id)}
+                            disabled={isDeleting}
+                          >
+                            {isDeleting ? (
+                              <div className="animate-spin h-3.5 w-3.5 border-2 border-t-transparent rounded-full" />
+                            ) : (
+                              <Trash className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                      {note.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-3">
+                          {note.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
