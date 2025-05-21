@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
-import { checkStudentAptitudeTestRequired, getStudentEnrollments, getStudentClasses, getClassSubjects } from "../../../../aptitude-test/api/assessment-api;
+import { checkStudentAptitudeTestRequired, getStudentEnrollments, getStudentClasses, getClassSubjects } from "../../aptitude-test/api/assessment-api";
 import { getStudentProgress } from "../api/progress-service";
 
 /**

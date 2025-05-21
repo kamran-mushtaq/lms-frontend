@@ -21,6 +21,11 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Chapter, ChapterProgress } from "../types";
+import { 
+  isChapterAccessible, 
+  getCompletedChapters, 
+  calculateChapterProgressPercentage 
+} from '@/utils/sequential-learning';
 
 interface ChapterListProps {
   chapters: Chapter[];
@@ -34,19 +39,33 @@ export function ChapterList({ chapters, completedChapters }: ChapterListProps) {
   // Sort chapters by order
   const sortedChapters = [...chapters].sort((a, b) => a.order - b.order);
 
+  // Get completed chapters from localStorage
+  const completedChaptersFromStorage = getCompletedChapters(sortedChapters);
+
   // Log chapter data to debug
   useEffect(() => {
     console.log('ChapterList - chapters:', chapters);
     console.log('ChapterList - chapter IDs:', chapters.map(c => c._id));
     console.log('ChapterList - completedChapters:', completedChapters);
-  }, [chapters, completedChapters]);
+    console.log('ChapterList - completedChaptersFromStorage:', completedChaptersFromStorage);
+  }, [chapters, completedChapters, completedChaptersFromStorage]);
 
   const getChapterProgress = (chapterId: string) => {
     return completedChapters.find(cp => cp.id === chapterId) || null;
   };
   
   // Log each button click with complete chapter details
-  const handleStartChapter = (chapterId: string, chapter: Chapter) => {
+  const handleStartChapter = (chapterId: string, chapter: Chapter, chapterIndex: number) => {
+    // Check if chapter is accessible based on sequential learning
+    const isAccessible = isChapterAccessible(chapterIndex, sortedChapters, completedChaptersFromStorage);
+    
+    if (!isAccessible) {
+      // Show message about sequential learning requirement
+      const previousChapter = sortedChapters[chapterIndex - 1];
+      alert(`Please complete the previous chapter "${previousChapter?.displayName}" first to unlock this chapter.`);
+      return;
+    }
+    
     // Log the complete chapter object and ID for debugging
     console.log(`Navigating to chapter:`, {
       id: chapterId,
@@ -75,12 +94,13 @@ export function ChapterList({ chapters, completedChapters }: ChapterListProps) {
 
   return (
     <div className="space-y-4">
-      {sortedChapters.map((chapter) => {
+      {sortedChapters.map((chapter, index) => {
         const chapterProgress = getChapterProgress(chapter._id);
-        const progressPercentage = chapterProgress?.progressPercentage || 0;
-        const isLocked = chapter.isLocked;
-        const isCompleted = chapterProgress?.status === "completed";
-        const isInProgress = chapterProgress?.status === "in_progress";
+        const progressPercentage = calculateChapterProgressPercentage(chapter);
+        const isAccessible = isChapterAccessible(index, sortedChapters, completedChaptersFromStorage);
+        const isCompleted = completedChaptersFromStorage.includes(chapter._id);
+        const isInProgress = progressPercentage > 0 && !isCompleted;
+        const isLocked = !isAccessible;
         
         return (
           <Accordion
@@ -109,15 +129,24 @@ export function ChapterList({ chapters, completedChapters }: ChapterListProps) {
                       Chapter {chapter.order}: {chapter.displayName}
                     </h3>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>{chapter.lectures.length} Lectures</span>
+                      <span>{chapter.lectures?.length || 0} Lectures</span>
                       <span>•</span>
-                      <span>{chapter.duration} min</span>
+                      <span>{chapter.duration || 0} min</span>
                       
                       {progressPercentage > 0 && (
                         <>
                           <span>•</span>
                           <span>
                             {progressPercentage}% Complete
+                          </span>
+                        </>
+                      )}
+                      
+                      {isLocked && (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-600 font-medium">
+                            🔒 Locked
                           </span>
                         </>
                       )}
@@ -148,7 +177,7 @@ export function ChapterList({ chapters, completedChapters }: ChapterListProps) {
                     {chapter.description || "No description available for this chapter."}
                   </p>
                   
-                  {chapter.prerequisites.length > 0 && (
+                  {chapter.prerequisites && chapter.prerequisites.length > 0 && (
                     <div className="text-sm">
                       <p className="font-medium">Prerequisites:</p>
                       <ul className="list-disc list-inside text-muted-foreground">
@@ -162,15 +191,15 @@ export function ChapterList({ chapters, completedChapters }: ChapterListProps) {
                   <Button
                     className="w-full sm:w-auto"
                     disabled={isLocked}
-                    onClick={() => handleStartChapter(chapter._id, chapter)}
+                    onClick={() => handleStartChapter(chapter._id, chapter, index)}
                   >
                     {isCompleted ? "Review Chapter" : isInProgress ? "Continue Chapter" : "Start Chapter"}
                     <ArrowRightIcon className="h-4 w-4 ml-2" />
                   </Button>
                   
                   {isLocked && (
-                    <p className="text-sm text-muted-foreground italic">
-                      Complete the previous chapter to unlock this content.
+                    <p className="text-sm text-amber-600 italic mt-2">
+                      🔒 Complete the previous chapter to unlock this content.
                     </p>
                   )}
                 </div>

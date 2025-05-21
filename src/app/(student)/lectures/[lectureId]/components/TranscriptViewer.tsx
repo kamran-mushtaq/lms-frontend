@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TranscriptSegment } from "../hooks/useTranscript";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ interface TranscriptViewerProps {
   error: string | null;
   hasTranscript: boolean;
   onTimeClick?: (time: number) => void;
+  currentTime?: number;
 }
 
 export default function TranscriptViewer({
@@ -20,10 +21,50 @@ export default function TranscriptViewer({
   loading,
   error,
   hasTranscript,
-  onTimeClick
+  onTimeClick,
+  currentTime
 }: TranscriptViewerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentSegment, setCurrentSegment] = useState<number | null>(null);
+  
+  // Reference to transcript container for scrolling
+  const transcriptContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Update currentSegment based on video's currentTime
+  useEffect(() => {
+    if (currentTime !== undefined && transcript.length > 0) {
+      const segmentIndex = transcript.findIndex(
+        (segment, i) => {
+          const isLast = i === transcript.length - 1;
+          const nextStart = isLast ? Infinity : transcript[i + 1].start;
+          return currentTime >= segment.start && currentTime < nextStart;
+        }
+      );
+      
+      if (segmentIndex !== -1) {
+        setCurrentSegment(segmentIndex);
+        
+        // Scroll the current segment into view if it's not visible
+        setTimeout(() => {
+          const container = transcriptContainerRef.current;
+          const currentSegmentEl = container?.querySelector(`[data-segment-index="${segmentIndex}"]`);
+          
+          if (container && currentSegmentEl) {
+            const containerRect = container.getBoundingClientRect();
+            const segmentRect = currentSegmentEl.getBoundingClientRect();
+            
+            // Check if segment is not visible in the container
+            if (
+              segmentRect.top < containerRect.top || 
+              segmentRect.bottom > containerRect.bottom
+            ) {
+              currentSegmentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+        }, 100);
+      }
+    }
+  }, [currentTime, transcript]);
   
   // Filter transcript by search query
   const filteredTranscript = searchQuery
@@ -129,7 +170,7 @@ export default function TranscriptViewer({
         </div>
         
         {/* Transcript segments */}
-        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+        <div ref={transcriptContainerRef} className="space-y-4 max-h-96 overflow-y-auto pr-2">
           {filteredTranscript.length === 0 ? (
             <div className="text-center py-4">
               <p className="text-sm text-muted-foreground">
@@ -140,8 +181,9 @@ export default function TranscriptViewer({
             filteredTranscript.map((segment, index) => (
               <div
                 key={`${segment.start}-${index}`}
+                data-segment-index={index}
                 className={`p-2 rounded-md transition-colors ${
-                  currentSegment === index ? 'bg-muted' : 'hover:bg-muted/50'
+                currentSegment === index ? 'bg-primary/10 border-l-4 border-primary' : 'hover:bg-muted/50'
                 }`}
                 onClick={() => {
                   setCurrentSegment(index);

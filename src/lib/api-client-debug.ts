@@ -1,58 +1,53 @@
 // lib/api-client-debug.ts
-// This is a debug wrapper around your existing API client to log all requests
+import apiClient, { API_BASE_URL } from './api-client';
+import axios from 'axios';
 
-import apiClient from "./api-client";
-
-const debugApiClient = {
-  ...apiClient,
-
-  get: async (url: string, config?: any) => {
-    console.log(`[DEBUG] GET Request to: ${url}`, config);
-    try {
-      const response = await apiClient.get(url, config);
-      console.log(`[DEBUG] GET Response from: ${url}`, response.status);
-      return response;
-    } catch (error) {
-      console.error(`[DEBUG] GET Error from: ${url}`, error);
-      throw error;
-    }
-  },
-
-  post: async (url: string, data?: any, config?: any) => {
-    console.log(`[DEBUG] POST Request to: ${url}`, { data, config });
-    try {
-      const response = await apiClient.post(url, data, config);
-      console.log(`[DEBUG] POST Response from: ${url}`, response.status);
-      return response;
-    } catch (error) {
-      console.error(`[DEBUG] POST Error from: ${url}`, error);
-      throw error;
-    }
-  },
-
-  put: async (url: string, data?: any, config?: any) => {
-    console.log(`[DEBUG] PUT Request to: ${url}`, { data, config });
-    try {
-      const response = await apiClient.put(url, data, config);
-      console.log(`[DEBUG] PUT Response from: ${url}`, response.status);
-      return response;
-    } catch (error) {
-      console.error(`[DEBUG] PUT Error from: ${url}`, error);
-      throw error;
-    }
-  },
-
-  delete: async (url: string, config?: any) => {
-    console.log(`[DEBUG] DELETE Request to: ${url}`, config);
-    try {
-      const response = await apiClient.delete(url, config);
-      console.log(`[DEBUG] DELETE Response from: ${url}`, response.status);
-      return response;
-    } catch (error) {
-      console.error(`[DEBUG] DELETE Error from: ${url}`, error);
-      throw error;
-    }
-  }
+// Debug information about the API client
+export const getApiClientInfo = () => {
+  return {
+    baseURL: apiClient.defaults.baseURL,
+    timeout: apiClient.defaults.timeout,
+    headers: apiClient.defaults.headers,
+    apiBaseUrl: API_BASE_URL,
+  };
 };
 
-export default debugApiClient;
+// Test if the API is reachable
+export const testApiConnectivity = async (endpoint = '/auth/test') => {
+  try {
+    // Test with apiClient
+    console.log(`Testing API connectivity with apiClient to ${endpoint}`);
+    const apiClientResponse = await apiClient.get(endpoint);
+    console.log('apiClient response:', apiClientResponse.data);
+
+    // Test with direct axios call to ensure we're using the correct URL
+    const directEndpoint = `${API_BASE_URL}${endpoint}`;
+    console.log(`Testing API connectivity with direct axios to ${directEndpoint}`);
+    const directResponse = await axios.get(directEndpoint);
+    console.log('Direct axios response:', directResponse.data);
+
+    // Test alternative URL with /api prefix explicitly added
+    const alternativeEndpoint = `http://localhost:3005/api${endpoint}`;
+    console.log(`Testing API connectivity with alternative URL to ${alternativeEndpoint}`);
+    const alternativeResponse = await axios.get(alternativeEndpoint);
+    console.log('Alternative URL response:', alternativeResponse.data);
+
+    return {
+      apiClientSuccess: true,
+      apiClientData: apiClientResponse.data,
+      directSuccess: true,
+      directData: directResponse.data,
+      alternativeSuccess: true,
+      alternativeData: alternativeResponse.data,
+    };
+  } catch (error) {
+    console.error('API connectivity test error:', error);
+    
+    return {
+      error: error.message,
+      apiClientSuccess: false,
+      directSuccess: false,
+      alternativeSuccess: false,
+    };
+  }
+};

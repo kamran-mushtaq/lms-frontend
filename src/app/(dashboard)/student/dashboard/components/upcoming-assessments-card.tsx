@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExternalLink, ClipboardList, AlertCircle } from "lucide-react";
-import { getStudentAssessmentResults } from "../../../../aptitude-test/api/assessment-api";
+import { getPendingAssessments } from "../../../../aptitude-test/api/assessment-api";
 
 interface UpcomingAssessmentsCardProps {
   studentId: string;

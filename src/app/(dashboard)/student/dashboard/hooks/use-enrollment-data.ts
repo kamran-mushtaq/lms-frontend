@@ -1,6 +1,6 @@
 // app/dashboard/hooks/use-enrollment-data.ts
 import { useState, useEffect } from 'react';
-import { getStudentEnrollments, getStudentClasses, getClassSubjects } from '../../../aptitude-test/api/assessment-api';
+import { getStudentEnrollments, getStudentClasses, getClassSubjects } from '../../aptitude-test/api/assessment-api';
 import { 
   generateMockClasses, 
   generateMockSubjects,

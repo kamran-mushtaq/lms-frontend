@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getLecturesByChapter } from '../../api/lecture-service';
+import { applySequentialLearning } from '@/utils/sequential-learning';
 
 export interface NavigationData {
   chapterId: string;
@@ -11,6 +12,12 @@ export interface NavigationData {
     title: string;
     order: number;
     isCompleted?: boolean;
+    isAccessible?: boolean; // Add accessibility flag for sequential learning
+    studentProgress?: {
+      progress: number;
+      timeSpent: number;
+      status: string;
+    };
   }>;
   currentIndex: number;
 }
@@ -36,7 +43,16 @@ export function useNavigation(lectureId: string, chapterId: string) {
       setLoading(true);
       setError(null);
       
+      // Get all lectures for the chapter
+      console.log(`Fetching navigation data for chapter: ${chapterId}`);
       const chapterData = await getLecturesByChapter(chapterId);
+      
+      // Log the raw data
+      console.log('Raw chapter data:', chapterData);
+      
+      // Check if lectures have progress data
+      const hasProgressData = chapterData.lectures.some(l => l.studentProgress);
+      console.log('Lectures have progress data:', hasProgressData);
       
       const newNavData: NavigationData = {
         chapterId: chapterId,
@@ -44,6 +60,13 @@ export function useNavigation(lectureId: string, chapterId: string) {
         lectures: chapterData.lectures || [],
         currentIndex: -1
       };
+      
+      // For lectures without server progress data, check localStorage and apply sequential learning
+      if (typeof window !== 'undefined') {
+        // Apply sequential learning restrictions
+        const lecturesWithRestrictions = applySequentialLearning(newNavData.lectures, lectureId);
+        newNavData.lectures = lecturesWithRestrictions;
+      }
       
       // Find current lecture index
       const currentIndex = newNavData.lectures.findIndex(
@@ -74,7 +97,7 @@ export function useNavigation(lectureId: string, chapterId: string) {
       loadData();
     }
     
-    // Cleanup function to prevent state updates after unmount
+    // Cleanup function
     return () => {
       isMounted = false;
     };
@@ -93,6 +116,11 @@ export function useNavigation(lectureId: string, chapterId: string) {
     ? navigationData.lectures[navigationData.currentIndex + 1]?._id 
     : null;
 
+  // Check if current lecture is completed to enable next
+  const isCurrentCompleted = navigationData.currentIndex >= 0 &&
+    (navigationData.lectures[navigationData.currentIndex]?.isCompleted === true ||
+     (navigationData.lectures[navigationData.currentIndex]?.studentProgress?.status === 'completed'));
+
   return {
     navigationData,
     loading,
@@ -101,6 +129,7 @@ export function useNavigation(lectureId: string, chapterId: string) {
     hasNext,
     previousLectureId,
     nextLectureId,
+    isCurrentCompleted,
     refreshNavigation: fetchNavigation
   };
 }

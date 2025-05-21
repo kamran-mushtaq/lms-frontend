@@ -1,5 +1,5 @@
-// src/services/lecture-service.ts
-import apiClient from '@/lib/api-client';
+// src/app/(student)/lectures/api/lecture-service.ts
+import apiClient, { getStudentId } from '@/lib/api-client';
 
 // Define types for better type checking
 export interface Lecture {
@@ -30,6 +30,11 @@ export interface Lecture {
   nextLecture?: string;
   createdAt: string;
   updatedAt: string;
+  studentProgress?: {
+    progress: number;
+    timeSpent: number;
+    status: string;
+  };
 }
 
 export interface TranscriptItem {
@@ -44,7 +49,8 @@ export interface NavigationData {
     _id: string;
     title: string;
     order: number;
-    completionStatus: 'completed' | 'in_progress' | 'not_started';
+    isCompleted?: boolean;
+    completionStatus?: 'completed' | 'in_progress' | 'not_started';
   }>;
 }
 
@@ -87,7 +93,12 @@ export const testApiConnection = async () => {
  */
 export const getLectureById = async (id: string): Promise<Lecture> => {
   try {
-    const response = await apiClient.get(`/lectures/${id}`);
+    const studentId = getStudentId();
+    const url = studentId 
+      ? `/lectures/${id}?studentId=${studentId}` 
+      : `/lectures/${id}`;
+    
+    const response = await apiClient.get(url);
     return response.data;
   } catch (error) {
     console.error('Error fetching lecture:', error);
@@ -100,8 +111,46 @@ export const getLectureById = async (id: string): Promise<Lecture> => {
  */
 export const getLectureDetails = async (id: string) => {
   try {
-    // Use the correct endpoint first
-    const response = await apiClient.get(`/lectures/${id}/details`);
+    const studentId = getStudentId();
+    // Include studentId query param for progress data
+    const url = studentId 
+      ? `/lectures/${id}/details?studentId=${studentId}` 
+      : `/lectures/${id}/details`;
+      
+    console.log(`Fetching lecture details from: ${url}`);
+    const response = await apiClient.get(url);
+    
+    // Log received data for debugging
+    console.log(`Lecture details received:`, {
+      id,
+      title: response.data.title,
+      hasProgress: !!response.data.studentProgress,
+      progress: response.data.studentProgress?.progress,
+      status: response.data.studentProgress?.status
+    });
+    
+    // Try to load any cached progress
+    if (!response.data.studentProgress && typeof window !== 'undefined') {
+      try {
+        const progressKey = `lecture_progress_${id}`;
+        const localProgress = localStorage.getItem(progressKey);
+        
+        if (localProgress) {
+          const parsedProgress = JSON.parse(localProgress);
+          console.log('Found cached progress:', parsedProgress);
+          
+          // Add it to the response data
+          response.data.studentProgress = {
+            progress: parsedProgress.progress || 0,
+            timeSpent: parsedProgress.timeSpent || 0,
+            status: parsedProgress.isCompleted ? 'completed' : 'in_progress'
+          };
+        }
+      } catch (err) {
+        console.error('Error loading cached progress:', err);
+      }
+    }
+    
     return response.data;
   } catch (error) {
     console.error('Error fetching lecture details:', error);
@@ -148,14 +197,32 @@ export const getLectureResources = async (id: string) => {
  */
 export const getLecturesByChapter = async (chapterId: any): Promise<any> => {
   try {
-    // Use the correct endpoint from the API documentation
-    const response = await apiClient.get(`/lectures/byChapter/${chapterId._id}`);
+    const studentId = getStudentId();
+    // Include studentId query param for progress data
+    const url = studentId 
+      ? `/lectures/byChapter/${chapterId._id}?studentId=${studentId}` 
+      : `/lectures/byChapter/${chapterId._id}`;
+      
+    console.log(`Fetching chapter lectures from: ${url}`);
+    const response = await apiClient.get(url);
     
-    // The API returns a Lecture[] directly, not an object with lectures property
     const lectures = response.data;
+    console.log(`Received ${lectures.length} lectures for chapter ${chapterId._id}`);
     
-    // If we need chapter title, we'd need to make a separate call
-    // For now, return empty chapter title and the lectures array
+    // Check if any lectures have progress data
+    const hasProgressData = lectures.some(l => l.studentProgress);
+    console.log('Lectures have progress data:', hasProgressData);
+    
+    // Sort lectures by order
+    if (Array.isArray(lectures)) {
+      lectures.sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) {
+          return a.order - b.order;
+        }
+        return 0;
+      });
+    }
+    
     return {
       chapterTitle: '', // We'd need to fetch this separately if needed
       lectures: lectures
@@ -179,37 +246,40 @@ const lastProgressUpdate = {
 
 export const updateLectureProgress = async (id: string, progressData: ProgressData) => {
   try {
-    // Implement throttling - only update progress every 10 seconds at most
-    // and only if progress has increased by at least 2%
+    // Implement throttling - only update progress every 5 seconds at most
+    // or if progress has increased by at least 2%
     const now = Date.now();
     const timeSinceLastUpdate = now - lastProgressUpdate.timestamp;
     const progressDifference = (progressData.progress || 0) - lastProgressUpdate.progress;
     
     const isSignificantProgressChange = progressDifference >= 2 || 
-                                        (progressData.progress || 0) >= 99;
-    const isTimeToUpdate = timeSinceLastUpdate >= 10000 || 
+                                       (progressData.progress || 0) >= 99;
+    const isTimeToUpdate = timeSinceLastUpdate >= 5000 || 
                           (progressData.progress || 0) >= 99;
     const isDifferentLecture = id !== lastProgressUpdate.lectureId;
+    
+    // Always save to localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`lecture_progress_${id}`, JSON.stringify({
+          progress: progressData.progress || 0,
+          timeSpent: progressData.currentTime || 0,
+          isCompleted: (progressData.progress || 0) >= 95,
+          timestamp: Date.now()
+        }));
+      } catch (err) {
+        console.error('Error saving progress to localStorage:', err);
+      }
+    }
     
     if (!isSignificantProgressChange && !isTimeToUpdate && !isDifferentLecture) {
       return null; // Skip API call if not needed
     }
     
-    // Get user info from localStorage
-    let studentId = '';
-    try {
-      const userJson = localStorage.getItem('user');
-      if (userJson) {
-        const user = JSON.parse(userJson);
-        studentId = user.id || user._id;
-      }
-      
-      if (!studentId) {
-        console.error('No student ID found in user data');
-        return null;
-      }
-    } catch (e) {
-      console.error('Error getting user from localStorage:', e);
+    // Get student ID
+    const studentId = getStudentId();
+    if (!studentId) {
+      console.error('No student ID found');
       return null;
     }
     
@@ -219,7 +289,7 @@ export const updateLectureProgress = async (id: string, progressData: ProgressDa
     lastProgressUpdate.progress = progressData.progress || 0;
     lastProgressUpdate.currentTime = progressData.currentTime || 0;
     
-    // Use the correct endpoint from the API documentation
+    // Prepare payload
     const payload = {
       studentId,
       progress: {
@@ -228,43 +298,24 @@ export const updateLectureProgress = async (id: string, progressData: ProgressDa
       }
     };
     
-    // Try different possible endpoints since we're getting 404
-    const possibleEndpoints = [
-      `/lectures/${id}/progress`,
-    ];
+    // Log what we're sending
+    console.log(`Sending progress update for lecture ${id}:`, {
+      studentId,
+      progress: progressData.progress,
+      currentTime: progressData.currentTime
+    });
     
-    for (const endpoint of possibleEndpoints) {
-      try {
-        console.log(`Trying progress endpoint: ${endpoint}`, payload);
-        const response = await apiClient.post(endpoint, payload);
-        console.log(`✅ Progress update successful on ${endpoint}:`, response.data);
-        return response.data;
-      } catch (error: any) {
-        console.log(`❌ Failed on ${endpoint} - Status: ${error.response?.status}, Data:`, error.response?.data);
-        
-        // If it's not the last endpoint, continue to the next one
-        if (endpoint !== possibleEndpoints[possibleEndpoints.length - 1]) {
-          continue;
-        }
-        
-        // If all endpoints fail, throw the last error
-        throw error;
-      }
+    // Try to update progress
+    try {
+      const response = await apiClient.post(`/lectures/${id}/progress`, payload);
+      console.log(`Progress update successful:`, response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Progress update failed:`, error);
+      throw error;
     }
   } catch (error: any) {
     console.error('Error updating lecture progress:', error);
-    console.error('Error details:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      config: {
-        url: error.config?.url,
-        method: error.config?.method,
-        baseURL: error.config?.baseURL,
-        headers: error.config?.headers
-      }
-    });
-    
     // Don't throw error, just return null to prevent UI crashes
     return null;
   }
@@ -275,64 +326,40 @@ export const updateLectureProgress = async (id: string, progressData: ProgressDa
  */
 export const markLectureAsCompleted = async (id: string) => {
   try {
-    // Get user info from localStorage
-    let studentId = '';
-    try {
-      const userJson = localStorage.getItem('user');
-      if (userJson) {
-        const user = JSON.parse(userJson);
-        studentId = user.id || user._id;
-      }
-      
-      if (!studentId) {
-        console.error('No student ID found in user data');
-        return null;
-      }
-    } catch (e) {
-      console.error('Error getting user from localStorage:', e);
+    const studentId = getStudentId();
+    if (!studentId) {
+      console.error('No student ID found');
       return null;
     }
     
-    // Try different possible endpoints since we're getting 404
-    const possibleEndpoints = [
-      `/lectures/${id}/complete`,
-      `/api/lectures/${id}/complete`
-    ];
+    // Store completion status in localStorage too
+    if (typeof window !== 'undefined') {
+      try {
+        const progressData = localStorage.getItem(`lecture_progress_${id}`);
+        let updatedProgress = progressData ? JSON.parse(progressData) : {};
+        updatedProgress.isCompleted = true;
+        updatedProgress.progress = 100;
+        updatedProgress.timestamp = Date.now();
+        localStorage.setItem(`lecture_progress_${id}`, JSON.stringify(updatedProgress));
+      } catch (err) {
+        console.error('Error saving completion to localStorage:', err);
+      }
+    }
     
     const payload = { studentId };
     
-    for (const endpoint of possibleEndpoints) {
-      try {
-        console.log(`Trying complete endpoint: ${endpoint}`, payload);
-        const response = await apiClient.post(endpoint, payload);
-        console.log(`✅ Lecture completion successful on ${endpoint}:`, response.data);
-        return response.data;
-      } catch (error: any) {
-        console.log(`❌ Failed on ${endpoint} - Status: ${error.response?.status}, Data:`, error.response?.data);
-        
-        // If it's not the last endpoint, continue to the next one
-        if (endpoint !== possibleEndpoints[possibleEndpoints.length - 1]) {
-          continue;
-        }
-        
-        // If all endpoints fail, throw the last error
-        throw error;
-      }
+    console.log(`Marking lecture ${id} as completed for student ${studentId}`);
+    
+    try {
+      const response = await apiClient.post(`/lectures/${id}/complete`, payload);
+      console.log(`Lecture completion successful:`, response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Lecture completion failed:`, error);
+      throw error;
     }
   } catch (error: any) {
     console.error('Error marking lecture as completed:', error);
-    console.error('Error details:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      config: {
-        url: error.config?.url,
-        method: error.config?.method,
-        baseURL: error.config?.baseURL,
-        headers: error.config?.headers
-      }
-    });
-    
     // Don't throw error, just return null to prevent UI crashes
     return null;
   }

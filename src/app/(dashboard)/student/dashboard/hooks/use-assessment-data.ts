@@ -1,6 +1,6 @@
 // app/dashboard/hooks/use-assessment-data.ts
 import { useState, useEffect } from 'react';
-import { getPendingAssessments, getStudentAssessmentResults } from '../../../aptitude-test/api/assessment-api';
+import { getPendingAssessments, getStudentAssessmentResults } from '../../aptitude-test/api/assessment-api';
 import { generateMockAssessments, generateMockAssessmentResults } from '@/lib/mock-data';
 
 interface AssessmentDataHookProps {

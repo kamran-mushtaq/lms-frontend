@@ -95,6 +95,7 @@ export const getNotesByLecture = async (lectureId: string): Promise<NotesRespons
  */
 export const createNote = async (lectureId: string, noteData: NoteData): Promise<Note> => {
   try {
+    console.log('createNote received noteData:', noteData);
     console.log(`Creating note for lecture ${lectureId}:`, noteData);
     
     // Ensure tags is included in the payload

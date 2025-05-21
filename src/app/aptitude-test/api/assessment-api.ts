@@ -2,10 +2,22 @@
 import apiClient from "@/lib/api-client";
 
 // Get pending assessments for a student
-export const getPendingAssessments = async (studentId: string) => {
+export const getPendingAssessments = async (studentId: string, retries = 3) => {
   try {
-    const response = await apiClient.get(`/assessments/pending/${studentId}`);
-    return response.data;
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await apiClient.get(`/enrollment/pending-tests/${studentId}`);
+        return response.data;
+      } catch (error: any) {
+        console.error(`Attempt ${i + 1} failed:`, error);
+        if (i === retries - 1) {
+          // If it's the last retry, throw the error
+          throw new Error('Failed to load pending assessments after multiple retries. Please try again later.');
+        }
+        // Wait for a short duration before retrying (e.g., 1 second)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
   } catch (error) {
     console.error('Error fetching pending assessments:', error);
     throw new Error('Failed to load pending assessments. Please try again later.');
@@ -506,7 +518,7 @@ export const getStudentProgressOverview = async (studentId: string) => {
       throw new Error('Student ID is required');
     }
     
-    const response = await apiClient.get(`/student-progress/${studentId}`);
+    const response = await apiClient.get(`/student-progress/${studentId}/overview`);
     
     // Structure the progress overview
     const progressOverview = {

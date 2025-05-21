@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getLectureDetails } from '../../api/lecture-service';
 
 // Types
@@ -13,7 +13,7 @@ export interface Lecture {
   chapterId: string;
   order: number;
   hasTranscript: boolean;
-  resources: Resource[];
+  resources: any[];
   metadata?: Record<string, any>;
   createdAt: string;
   updatedAt: string;
@@ -28,16 +28,6 @@ export interface Lecture {
       thumbnailUrl?: string;
     }
   };
-}
-
-export interface Resource {
-  title: string;
-  type: string;
-  resourceType: string;
-  url?: string;
-  fileId?: string;
-  content?: string;
-  description?: string;
 }
 
 // Empty state
@@ -58,10 +48,34 @@ export function useLecture(lectureId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Progress state initialized from lecture data
+  // Progress state
   const [watchProgress, setWatchProgress] = useState(0);
   const [timeSpent, setTimeSpent] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  
+  // Use refs to track initial load
+  const initialLoadCompleted = useRef(false);
+  
+  // Try to load progress from localStorage first
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !initialLoadCompleted.current) {
+      try {
+        const progressKey = `lecture_progress_${lectureId}`;
+        const localProgress = localStorage.getItem(progressKey);
+        
+        if (localProgress) {
+          const parsedProgress = JSON.parse(localProgress);
+          console.log('Found cached progress:', parsedProgress);
+          
+          setWatchProgress(parsedProgress.progress || 0);
+          setTimeSpent(parsedProgress.timeSpent || 0);
+          setIsCompleted(parsedProgress.isCompleted || false);
+        }
+      } catch (err) {
+        console.error('Error loading cached progress:', err);
+      }
+    }
+  }, [lectureId]);
   
   // Fetch lecture data
   const fetchLecture = useCallback(async () => {
@@ -71,7 +85,8 @@ export function useLecture(lectureId: string) {
       setLoading(true);
       setError(null);
       
-      // Fetch main lecture data
+      // Fetch lecture data with progress
+      console.log(`Fetching lecture data for: ${lectureId}`);
       const lectureData = await getLectureDetails(lectureId);
       
       if (!lectureData || !lectureData._id) {
@@ -85,12 +100,21 @@ export function useLecture(lectureId: string) {
         document.title = `${lectureData.title} | Learning Platform`;
       }
       
-      // Extract initial progress if available
+      // Extract progress from server data
       if (lectureData.studentProgress) {
-        setWatchProgress(lectureData.studentProgress.progress || 0);
-        setTimeSpent(lectureData.studentProgress.timeSpent || 0);
-        setIsCompleted(lectureData.studentProgress.status === 'completed');
+        console.log('Using server progress data:', lectureData.studentProgress);
+        
+        // Only update if values are higher than what we have
+        const serverProgress = lectureData.studentProgress.progress || 0;
+        const serverTimeSpent = lectureData.studentProgress.timeSpent || 0;
+        const serverStatus = lectureData.studentProgress.status === 'completed';
+        
+        setWatchProgress(prev => Math.max(prev, serverProgress));
+        setTimeSpent(prev => Math.max(prev, serverTimeSpent));
+        setIsCompleted(prev => prev || serverStatus);
       }
+      
+      initialLoadCompleted.current = true;
       
     } catch (err: any) {
       console.error('Error fetching lecture:', err);
@@ -110,7 +134,7 @@ export function useLecture(lectureId: string) {
     
     loadData();
     
-    // Cleanup function to prevent state updates after unmount
+    // Cleanup function
     return () => {
       isMounted = false;
     };
@@ -121,11 +145,8 @@ export function useLecture(lectureId: string) {
     loading,
     error,
     watchProgress,
-    setWatchProgress,
     timeSpent,
-    setTimeSpent,
     isCompleted,
-    setIsCompleted,
     refreshLecture: fetchLecture
   };
 }

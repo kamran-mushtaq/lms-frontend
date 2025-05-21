@@ -250,7 +250,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const response = await apiClient.post(`${API_URL}/auth/login`, {
+      // Use direct API URL with correct structure instead of using apiClient
+      // The apiClient is adding /api prefix, which is causing the 404 error
+      const response = await axios.post(`http://localhost:3005/api/auth/login`, {
         email,
         password,
       });

@@ -29,6 +29,7 @@ interface NotesPanelProps {
   error: string | null;
   lectureId: string;
   onNotesUpdate: () => void;
+  currentVideoTime?: number;
 }
 
 export default function NotesPanel({
@@ -36,7 +37,8 @@ export default function NotesPanel({
   loading,
   error,
   lectureId,
-  onNotesUpdate
+  onNotesUpdate,
+  currentVideoTime
 }: NotesPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -75,12 +77,14 @@ export default function NotesPanel({
         .filter(tag => tag.length > 0);
       
       // Call API to create note
-      await createNote({
+      const noteDataToCreate = {
         lectureId,
         content: newNoteContent,
         tags,
         timestamp: getCurrentVideoTime() // Implement this function to get current video time
-      });
+      };
+      console.log('handleCreateNote passing:', noteDataToCreate);
+      await createNote(lectureId, noteDataToCreate);
       
       // Reset form
       setNewNoteContent('');
@@ -166,11 +170,10 @@ export default function NotesPanel({
     setOperationError(null);
   };
   
-  // Helper function to get current video time (to be implemented)
+  // Helper function to get current video time
   const getCurrentVideoTime = () => {
-    // This would need to be connected to your video player component
-    // For now, we'll return the current timestamp
-    return Math.floor(Date.now() / 1000);
+    // Use provided video time if available, otherwise return 0
+    return currentVideoTime !== undefined ? currentVideoTime : 0;
   };
   
   // Format timestamp to readable time
@@ -266,6 +269,12 @@ export default function NotesPanel({
           <Card className="mb-4 border-primary/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Add New Note</CardTitle>
+              {currentVideoTime !== undefined && (
+                <div className="flex items-center text-xs text-muted-foreground mt-1">
+                  <Clock className="h-3 w-3 mr-1" />
+                  <span>Note at {formatTimestamp(currentVideoTime)}</span>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="space-y-4">

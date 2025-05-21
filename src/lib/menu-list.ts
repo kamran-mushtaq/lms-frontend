@@ -12,11 +12,35 @@ import {
   Settings,
   ListTodo,
   School,
-  CreditCard
+  CreditCard,
+  DollarSign,
+  Calculator,
+  Percent,
+  Receipt,
+  BadgePercent
 } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 
+export type UserRole = 'admin' | 'guardian' | 'student' | 'parent' | 'teacher';
+
+export function getRoleFromPath(pathname: string): UserRole {
+  if (pathname.includes('/admin')) return 'admin';
+  if (pathname.includes('/guardian')) return 'guardian';
+  if (pathname.includes('/student')) return 'student';
+  if (pathname.includes('/parent')) return 'parent';
+  if (pathname.includes('/teacher')) return 'teacher';
+  return 'admin'; // Default role
+}
+
+export function getUserRole(): UserRole | null {
+  if (typeof window === 'undefined') return null;
+  const role = localStorage.getItem('userRole');
+  if (role && ['admin', 'guardian', 'student', 'parent', 'teacher'].includes(role)) {
+    return role as UserRole;
+  }
+  return null;
+}
 
 type Submenu = {
   href: string;
@@ -28,7 +52,7 @@ type Menu = {
   href: string;
   label: string;
   active?: boolean;
-  icon: LucideIcon;
+  icon: any; // Using any for LucideIcon type
   submenus?: Submenu[];
 };
 
@@ -36,12 +60,9 @@ type Group = {
   groupLabel: string;
   menus: Menu[];
 };
-export function getMenuList(pathname: string): Group[] {
-  const { user } = useAuth();
-  console.log("user", user);
 
-  if (!user) return [];
-
+export function getMenuList(pathname: string, role: UserRole = 'admin'): Group[] {
+  // Common menus for all roles
   const commonMenus: Group[] = [
     {
       groupLabel: "Overview",
@@ -156,6 +177,47 @@ export function getMenuList(pathname: string): Group[] {
       ],
     },
     {
+      groupLabel: "Finance",
+      menus: [
+        {
+          href: "/manage/subject-pricing",
+          label: "Subject Pricing",
+          icon: DollarSign,
+          submenus: [],
+        },
+        {
+          href: "/manage/discount-rules",
+          label: "Discount Rules",
+          icon: BadgePercent,
+          submenus: [],
+        },
+        {
+          href: "/manage/tax-configurations",
+          label: "Tax Settings",
+          icon: Percent,
+          submenus: [],
+        },
+        {
+          href: "/manage/pricing-calculator",
+          label: "Price Calculator",
+          icon: Calculator,
+          submenus: [],
+        },
+        {
+          href: "/manage/invoices",
+          label: "Invoices",
+          icon: Receipt,
+          submenus: [],
+        },
+        // {
+        //   href: "/manage/payments",
+        //   label: "Payments",
+        //   icon: CreditCard,
+        //   submenus: [],
+        // },
+      ],
+    },
+    {
       groupLabel: "System Settings",
       menus: [
         {
@@ -168,12 +230,6 @@ export function getMenuList(pathname: string): Group[] {
           href: "#",
           label: "Notifications",
           icon: Bell,
-          submenus: [],
-        },
-        {
-          href: "#",
-          label: "Payments",
-          icon: CreditCard,
           submenus: [],
         },
       ],
@@ -200,8 +256,8 @@ export function getMenuList(pathname: string): Group[] {
     },
   ];
 
-  // Return menu based on user.type
-  switch (user.type) {
+  // Return menu based on role
+  switch (role) {
     case "admin":
       return [...commonMenus, ...adminMenus];
     case "guardian":
